@@ -1,0 +1,84 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset=utf-8>
+<title>Barnes-Hut Gravity simulation</title>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #111;
+	color: #ccc;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* N-BODY SPECIFIC */
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	overflow: hidden;
+}
+
+.point-mass {
+	background-color: #ccc;
+	border-radius: 100%;
+
+	position: absolute;
+	top: 0;
+	left: 0;
+
+	width: 4px;
+	height: 4px;
+}
+
+</style>
+<!--<script src = "https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>-->
+<script src = "jquery-2.2.3.min.js"></script>
+
+<script language = "javascript" src = "v.js"></script>
+<script language = "javascript" src = "barnes-hut.js"></script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>BARNES-HUT GRAVITY SIMULATION</h2>
+	<div id = "world"></div>
+
+	<div>
+	<p><i>A two-dimensional n-body simulation, implemented in javascript, with HTML/CSS visualisation. The Demo is initialised with 600 bodies of varying mass with random initial location and velocity.</i></p>
+
+	<p><i>Approximation algorithm due to J.Barnes and P.Hut, 1986. </i></p>
+	</div>
+
+	<div id = "credits">
+	J. Lok, April 2016.
+	</div>
+
+</div>
+
+
+</body>
+
+</html>

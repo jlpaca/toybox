@@ -1,0 +1,78 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+<script src = "jquery-2.2.3.min.js"></script>
+<script>
+	var canvas;
+	var context;
+	$(document).ready(function(){
+		canvas = document.getElementById('world');
+		context = canvas.getContext('2d');
+
+		context.clearRect(0, 0, canvas.width, canvas.height);
+	});
+
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>POLYGONS</h2>
+
+	<!--<div id = "world"></div>-->
+	<canvas id = "world" width = "720" height = "720"></canvas>
+
+	<div>
+
+	</div>
+
+	<div id = "credits">
+	J. Lok, April 2016.
+	</div>
+
+</div>
+
+
+</body>
+
+</html>

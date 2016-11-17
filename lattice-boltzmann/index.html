@@ -1,0 +1,72 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset=utf-8>
+<title>Lattice Boltzmann</title>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #777;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { color: #999; font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;
+
+	/*4+(720-250)/2*/
+	margin: 239px auto;
+
+	position: relative;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+<script src = "v.js"></script>
+<script src = "jquery-2.2.3.min.js"></script>
+<script src = "lattice-boltzmann.js"></script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>LATTICE BOLTZMANN</h2>
+
+	<!--<div id = "world"></div>-->
+	<canvas id = "world"></canvas>
+
+	<div>
+	<p><i>
+	A D2Q9 Lattice Gas Boltzmann simulation of fluid flow around a barrier with a no-slip surface. Fixed velocity conditions on boundary. The flow field shows the barrier shedding a von Kármán vortex street.</i></p>
+
+	<p><i>Implemented in javascript, visualisation with HTML5 canvas.</i></p>
+	</div>
+
+	<div id = "credits">
+	J. Lok, May 2016.
+	</div>
+
+</div>
+
+
+</body>
+
+</html>

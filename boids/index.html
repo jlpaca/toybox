@@ -1,0 +1,90 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset=utf-8>
+<title>Craig Reynold's boids</title>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #777;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { color: #999; font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* BOIDS SPECIFIC */
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	overflow: hidden;
+}
+
+.boid {
+
+
+	position: absolute;
+	top: 0;
+	left: 0;
+
+	width: 0;
+	height: 0;
+	border-top: 3px solid transparent;
+	border-bottom: 3px solid transparent;
+	border-left: 8px solid #999;
+}
+
+</style>
+<!--<script src = "https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>-->
+<script src = "jquery-2.2.3.min.js"></script>
+
+<script language = "javascript" src = "v.js"></script>
+<script language = "javascript" src = "boids.js"></script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>CRAIG REYNOLDS BOIDS</h2>
+	<div id = "world"></div>
+
+	<div>
+
+	<p><i>A demonstration of emergent behaviour exhibited by groups of agents with local perception and decision making. Each agent is aware of the behaviour of its peers within proximity: it is drawn to other nearby agents, and attempts to match velocity with nearby agents, while avoiding collision.</i></p>
+
+<p><i>The demo is interactive: the boids attempt to evade the cursor.</i></p>
+
+<p><i>Boids algorithm as described by Craig Reynolds, 1987. Implemented in javascript, visualisation in HTML/CSS.</i></p>
+	</div>
+
+	<div id = "credits">
+	J. Lok, April 2016.
+	</div>
+
+</div>
+
+
+</body>
+
+</html>

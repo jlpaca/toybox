@@ -1,0 +1,252 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/*world*/
+#world {
+	position: relative;
+	width: 720px;
+	height: 720px;
+
+	background-color: #eee;
+
+	overflow: hidden;
+}
+.particle {
+	cursor: default;
+
+	position: absolute;
+	top: 0;
+	left: 0;
+
+	width: 6px;
+	height: 6px;
+	background-color: #333;
+	background-clip: content-box;
+
+	border: 6px solid transparent;
+	border-radius: 100%;
+	
+	z-index: 128;
+}
+.particleHL {
+	border: 6px solid rgba(0, 0, 0, 0.2);
+}
+.distConstraint {
+	position: absolute;
+	top: 0;
+	left: 0;
+
+	height: 2px;
+
+	background-color: #333;
+
+	transform-origin: 1px 50%;
+}
+
+</style>
+<script src = "v.js"></script>
+
+<script>
+var dt = 0.1;
+
+var particle = function(index, mass, coord, velo){
+	//parameters
+	this.i = index;
+	this.m = (mass === 0 ? 0 : 1/mass);
+	this.q = coord;
+	this.prevq = sub(this.q, mul(dt, velo));
+
+	this.render();
+	this.elem = document.getElementById('P' + this.i);
+
+	this.elem.addEventListener('mouseover', this.mouseoverHandler);
+	this.elem.addEventListener('mouseout', this.mouseoutHandler);
+	this.elem.addEventListener('mousedown', this.mousedownHandler);
+	//this.elem.addEventListener('mouseup', this.mouseupHandler);
+}
+particle.prototype.render = function(){
+	var div = document.createElement('div');
+	div.id = "P" + this.i;
+	div.className = "particle";
+	W.appendChild(div);
+}
+particle.prototype.update = function(){
+	this.elem.style.transform = 'translate(' +
+	(this.q[0]-8) + 'px,' + (this.q[1]-8) + 'px)';
+}
+particle.prototype.integrate = function(){
+	if(this.i == dragTarget){
+		this.q = cursor;
+		this.prevq = cursor;
+	} else {
+		//var a = [0, 0];
+		var newq = sum(sub(mul(2, this.q), this.prevq), mul(dt*dt, g));
+		this.prevq = this.q;
+		this.q = newq;
+	}
+}
+particle.prototype.collide = function(){
+	//with box: placeholder.
+	if(this.q[0] <= 0){ this.q[0] = 0; this.prevq[0] = 0; }
+	else if (this.q[0] >= 719){ this.q[0] = 719; this.prevq[0] = 719; }
+	if(this.q[1] <= 0){ this.q[1] = 0; this.prevq[1] = 0; }
+	else if (this.q[1] >= 719){ this.q[1] = 719; this.prevq[1] = 719; }
+
+}
+
+particle.prototype.mouseoverHandler = function(e){ this.className = "particle particleHL"; }
+particle.prototype.mouseoutHandler = function(e){	this.className = "particle";}
+particle.prototype.mousedownHandler = function(e){
+	var i = this.id.substring(1);
+	dragTarget = i;
+	dragMass = P[i].mass;
+	P[i].mass = 0;
+}
+/*
+particle.prototype.mouseupHandler = function(e){
+	var i = this.id.substring(1);
+	dragTarget = -1;
+	P[i].mass = dragMass;
+}
+*/
+
+
+var distConstraint = function(index, targA, targB){
+	this.i = index;
+	this.A = targA;
+	this.B = targB;
+
+	this.L = mag(sub(targA.q, targB.q));
+
+	this.render();
+	this.elem = document.getElementById('dC' + this.i);
+}
+distConstraint.prototype.render = function(){
+	var d = sub(this.B.q, this.A.q);
+	var div = document.createElement('div');
+	div.id = "dC" + this.i;
+	div.className = "distConstraint";
+	W.appendChild(div);
+}
+distConstraint.prototype.update = function(){
+	var d = sub(this.B.q, this.A.q);
+	this.elem.style.transform = 'translate(' +
+							this.A.q[0] + 'px,' + this.A.q[1] + 'px) ' +
+							'rotate(' + Math.atan2(d[1], d[0]) + 'rad )';
+	this.elem.style.width =  mag(d) + 'px';
+}
+distConstraint.prototype.solve = function(){
+	var d = sub(this.B.q, this.A.q);
+	var err = (this.L - mag(d));
+	var ratio = this.A.m/(this.A.m+this.B.m);
+	this.A.q = sub(this.A.q, mul(ratio*err, unit(d)));
+	this.B.q = sum(this.B.q, mul((1-ratio)*err, unit(d)));
+}
+
+
+var cursor = [0, 0];
+function mousemoveHandler(e){
+	var rect;
+	rect = W.getBoundingClientRect();
+	cursor = [
+		e.clientX - document.body.scrollLeft - rect.left,
+		e.clientY - document.body.scrollTop - rect.top
+			];
+	//console.log(cursor);
+}
+function mouseupHandler(e){
+	if(dragTarget != -1){
+		P[dragTarget].mass = dragMass;
+		dragTarget = -1;
+	}
+}
+
+var W;
+
+var P = []; var pindex = 0;
+var C = []; var cindex = 0;
+
+var g = [0, 4];
+
+var dragTarget = -1; var dragMass = 1;
+function init(){
+
+	//setup
+	W = document.getElementById('world');
+	W.addEventListener('mousemove', mousemoveHandler);
+	W.addEventListener('mouseup', mouseupHandler);
+
+	//initial conditions
+	P[pindex] = new particle(pindex, 1, [100, 100], [0, -10]); ++pindex;
+	P[pindex] = new particle(pindex, 1, [200, 200], [0, 0]); ++pindex;
+	P[pindex] = new particle(pindex, 1, [200, 300], [0, 0]); ++pindex;
+
+	P[pindex] = new particle(pindex, 1, [240, 320], [0, 0]); ++pindex;
+	P[pindex] = new particle(pindex, 1, [240, 280], [0, 0]); ++pindex;
+
+	C[cindex] = new distConstraint(cindex, P[0], P[1]); ++cindex;
+	C[cindex] = new distConstraint(cindex, P[1], P[2]); ++cindex;
+
+	C[cindex] = new distConstraint(cindex, P[2], P[3]); ++cindex;
+	C[cindex] = new distConstraint(cindex, P[2], P[4]); ++cindex;
+	C[cindex] = new distConstraint(cindex, P[3], P[4]); ++cindex;
+
+	window.setInterval(timestep, 10);
+}
+
+var iters = 4;
+function timestep(){
+	for(var i = 0; i < P.length; ++i){ P[i].integrate(); }
+	for(var i = 0; i < P.length; ++i){ P[i].collide(); }
+
+	for(var j = 0; j < iters; ++j){
+	for(var i = 0; i < C.length; ++i){ C[i].solve(); }
+	}
+
+	for(var i = 0; i < P.length; ++i){ P[i].update(); }
+	for(var i = 0; i < C.length; ++i){ C[i].update(); }
+}
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>TITLE</h2>
+
+	<div id = "world"></div>
+	<script language = "javascript">init();</script>
+
+	<div id = "credits">
+	J. Lok, April 2016.
+	</div>
+
+</div>
+
+
+</body>
+
+</html>
