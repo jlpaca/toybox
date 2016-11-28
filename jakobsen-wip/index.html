@@ -176,8 +176,8 @@ function mousemoveHandler(e){
 	var rect;
 	rect = W.getBoundingClientRect();
 	cursor = [
-		e.clientX - document.body.scrollLeft - rect.left,
-		e.clientY - document.body.scrollTop - rect.top
+		e.clientX - rect.left,
+		e.clientY - rect.top
 			];
 	//console.log(cursor);
 }
@@ -188,6 +188,11 @@ function mouseupHandler(e){
 	}
 }
 
+function keydownHandler(e){
+	console.log(e.which);
+	timetoggle();
+}
+
 var W;
 
 var P = []; var pindex = 0;
@@ -196,12 +201,22 @@ var C = []; var cindex = 0;
 var g = [0, 4];
 
 var dragTarget = -1; var dragMass = 1;
+
+var timestepper  = null;
+function timestart(){ timestepper = window.setInterval(timestep, 10); }
+function timepause(){ window.clearInterval(timestepper); timestepper = null;}
+function timetoggle(){
+	if(timestepper == null){ timestart(); }
+	else { timepause(); }
+}
+	
 function init(){
 
 	//setup
 	W = document.getElementById('world');
 	W.addEventListener('mousemove', mousemoveHandler);
 	W.addEventListener('mouseup', mouseupHandler);
+	window.addEventListener('keydown', keydownHandler);
 
 	//initial conditions
 	P[pindex] = new particle(pindex, 1, [100, 100], [0, -10]); ++pindex;
@@ -218,7 +233,7 @@ function init(){
 	C[cindex] = new distConstraint(cindex, P[2], P[4]); ++cindex;
 	C[cindex] = new distConstraint(cindex, P[3], P[4]); ++cindex;
 
-	window.setInterval(timestep, 10);
+	timestart()
 }
 
 var iters = 4;
