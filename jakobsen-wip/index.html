@@ -82,6 +82,8 @@ var particle = function(index, mass, coord, velo){
 	this.render();
 	this.elem = document.getElementById('P' + this.i);
 
+	this.constraints = [];
+
 	this.elem.addEventListener('mouseover', this.mouseoverHandler);
 	this.elem.addEventListener('mouseout', this.mouseoutHandler);
 	this.elem.addEventListener('mousedown', this.mousedownHandler);
@@ -124,10 +126,16 @@ particle.prototype.collide = function(){
 particle.prototype.mouseoverHandler = function(e){ this.className = "particle particleHL"; }
 particle.prototype.mouseoutHandler = function(e){ this.className = "particle";}
 particle.prototype.mousedownHandler = function(e){
-	var i = this.id.substring(1);
-	dragTarget = i;
-	dragMass = P[i].mass;
-	P[i].mass = 0;
+	
+	e.stopPropagation()
+	console.log("particle " + this.id + " clicked");
+
+	if (timestepper == null) { // edit mode, edit
+
+	} else { // running, start drag
+		var i = this.id.substring(1);
+		dragstart(i);
+	}
 }
 /*
 particle.prototype.mouseupHandler = function(e){
@@ -142,6 +150,11 @@ var distConstraint = function(index, targA, targB){
 	this.i = index;
 	this.A = targA;
 	this.B = targB;
+
+	this.targAi = targA.constraints.length;
+	this.targBi = targB.constraints.length;
+	targA.constraints[this.targAi] = this;
+	targB.constraints[this.targBi] = this;
 
 	this.L = mag(sub(targA.q, targB.q));
 
@@ -182,15 +195,17 @@ function mousemoveHandler(e){
 	//console.log(cursor);
 }
 function mouseupHandler(e){
-	if(dragTarget != -1){
-		P[dragTarget].mass = dragMass;
-		dragTarget = -1;
-	}
+	dragstop();
+}
+function mousedownHandler(e){
+	console.log("world clicked");
 }
 
 function keydownHandler(e){
-	console.log(e.which);
-	timetoggle();
+	// console.log(e.which);
+	if (e.which == 32){
+		timetoggle();
+	}
 }
 
 var W;
@@ -198,13 +213,47 @@ var W;
 var P = []; var pindex = 0;
 var C = []; var cindex = 0;
 
+function removeP(i){
+	//console.log('REMOVEi P ' + P[i].i);
+	P[i].elem.parentNode.removeChild(P[i].elem);
+	for(var j = 0; j < P[i].constraints.length; ++j){
+		if(P[i].constraints[j] != null){
+			removeC(P[i].constraints[j].i);
+		}
+	}
+	P[i] = null;
+}
+function removeC(i){
+	//console.log('REMOVE C: ' + C[i].i);
+	C[i].elem.parentNode.removeChild(C[i].elem);
+	C[i].A.constraints[C[i].targAi] = null;
+	C[i].B.constraints[C[i].targBi] = null;
+	C[i] = null;
+}
+
+
 var g = [0, 4];
 
 var dragTarget = -1; var dragMass = 1;
+function dragstart(i){
+	dragTarget = i;
+	dragMass = P[i].mass;
+	P[i].mass = 0;
+}
+function dragstop(){
+	if(dragTarget != - 1){
+		P[dragTarget].mass = dragMass;
+		dragTarget = -1;
+	}
+}
 
 var timestepper  = null;
 function timestart(){ timestepper = window.setInterval(timestep, 10); }
-function timepause(){ window.clearInterval(timestepper); timestepper = null;}
+function timepause(){
+	window.clearInterval(timestepper);
+	timestepper = null;
+	dragstop();
+}
 function timetoggle(){
 	if(timestepper == null){ timestart(); }
 	else { timepause(); }
@@ -215,6 +264,7 @@ function init(){
 	//setup
 	W = document.getElementById('world');
 	W.addEventListener('mousemove', mousemoveHandler);
+	W.addEventListener('mousedown', mousedownHandler);
 	W.addEventListener('mouseup', mouseupHandler);
 	window.addEventListener('keydown', keydownHandler);
 
@@ -238,15 +288,15 @@ function init(){
 
 var iters = 4;
 function timestep(){
-	for(var i = 0; i < P.length; ++i){ P[i].integrate(); }
-	for(var i = 0; i < P.length; ++i){ P[i].collide(); }
+	for(var i = 0; i < P.length; ++i){ if(P[i] != null){ P[i].integrate(); }}
+	for(var i = 0; i < P.length; ++i){ if(P[i] != null){ P[i].collide(); }}
 
 	for(var j = 0; j < iters; ++j){
-	for(var i = 0; i < C.length; ++i){ C[i].solve(); }
+		for(var i = 0; i < C.length; ++i){ if(C[i] != null){ C[i].solve(); }}
 	}
 
-	for(var i = 0; i < P.length; ++i){ P[i].update(); }
-	for(var i = 0; i < C.length; ++i){ C[i].update(); }
+	for(var i = 0; i < P.length; ++i){ if(P[i] != null){ P[i].update(); }}
+	for(var i = 0; i < C.length; ++i){ if(C[i] != null){ C[i].update(); }}
 }
 </script>
 
