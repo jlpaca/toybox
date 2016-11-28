@@ -56,14 +56,14 @@ h2 { font-size: 18px; }
 }
 .distConstraint {
 	position: absolute;
-	top: 0;
+	top: -1px;
 	left: 0;
 
 	height: 2px;
 
 	background-color: #333;
 
-	transform-origin: 1px 50%;
+	transform-origin: 0px 50%;
 }
 
 </style>
@@ -95,7 +95,7 @@ particle.prototype.render = function(){
 }
 particle.prototype.update = function(){
 	this.elem.style.transform = 'translate(' +
-	(this.q[0]-8) + 'px,' + (this.q[1]-8) + 'px)';
+	(this.q[0]-9) + 'px,' + (this.q[1]-9) + 'px)';
 }
 particle.prototype.integrate = function(){
 	if(this.i == dragTarget){
@@ -108,17 +108,21 @@ particle.prototype.integrate = function(){
 		this.q = newq;
 	}
 }
+
+var boxmargin = 5;
+var boxmin = 0   + boxmargin // must be geq this
+var boxmax = 720 - boxmargin //must be leq this
 particle.prototype.collide = function(){
 	//with box: placeholder.
-	if(this.q[0] <= 0){ this.q[0] = 0; this.prevq[0] = 0; }
-	else if (this.q[0] >= 719){ this.q[0] = 719; this.prevq[0] = 719; }
-	if(this.q[1] <= 0){ this.q[1] = 0; this.prevq[1] = 0; }
-	else if (this.q[1] >= 719){ this.q[1] = 719; this.prevq[1] = 719; }
+	if(this.q[0] < boxmin){ this.q[0] = boxmin; this.prevq[0] = boxmin; }
+	if(this.q[1] < boxmin){ this.q[1] = boxmin; this.prevq[1] = boxmin; }
+	if (this.q[0] > boxmax){ this.q[0] = boxmax; this.prevq[0] = boxmax; }
+	if (this.q[1] > boxmax){ this.q[1] = boxmax; this.prevq[1] = boxmax; }
 
 }
 
 particle.prototype.mouseoverHandler = function(e){ this.className = "particle particleHL"; }
-particle.prototype.mouseoutHandler = function(e){	this.className = "particle";}
+particle.prototype.mouseoutHandler = function(e){ this.className = "particle";}
 particle.prototype.mousedownHandler = function(e){
 	var i = this.id.substring(1);
 	dragTarget = i;
@@ -153,9 +157,9 @@ distConstraint.prototype.render = function(){
 }
 distConstraint.prototype.update = function(){
 	var d = sub(this.B.q, this.A.q);
-	this.elem.style.transform = 'translate(' +
-							this.A.q[0] + 'px,' + this.A.q[1] + 'px) ' +
-							'rotate(' + Math.atan2(d[1], d[0]) + 'rad )';
+	this.elem.style.transform = "translate(" +
+		(this.A.q[0]) + "px,"+ (this.A.q[1]) + "px) " +
+		"rotate(" + Math.atan2(d[1], d[0]) + "rad )";
 	this.elem.style.width =  mag(d) + 'px';
 }
 distConstraint.prototype.solve = function(){
