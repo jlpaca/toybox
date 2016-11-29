@@ -27,7 +27,7 @@ function mousedownHandler(e){
 	var rect = canvas.getBoundingClientRect();
 	cursor[0] = Math.floor(e.clientX - rect.left);
 	cursor[1] = rect.height-Math.floor(e.clientY - rect.top);
-	cursor[2] = (e.which < 2 ? 1.0 : -1.0);
+	cursor[2] = (e.which < 2 ? -1.0 : 1.0);
 	//if(!RUN){ RUN = true; timestep(); }
 	//console.log(e);
 }
