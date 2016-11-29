@@ -1,4 +1,4 @@
-var dt = 0.1;
+var dt = 0.01;
 
 var particle = function(index, mass, coord, velo){
 	//parameters
@@ -32,8 +32,8 @@ particle.prototype.integrate = function(){
 		this.q = cursor;
 		this.prevq = cursor;
 	} else {
-		//var a = [0, 0];
-		var newq = sum(sub(mul(2, this.q), this.prevq), mul(dt*dt, g));
+		var a = NOG[this.i] ? [0, 0] : g;
+		var newq = sum(sub(mul(2, this.q), this.prevq), mul(dt*dt, a));
 		this.prevq = this.q;
 		this.q = newq;
 	}
@@ -67,27 +67,17 @@ particle.prototype.mousedownHandler = function(e){
 	updateCursor(e);
 	
 	e.stopPropagation()
-	console.log("particle " + this.elem.id + " clicked");
 
 	if (timestepper == null) { // edit mode, edit
 		if (e.which == 1) { // LMB: remove particle
-			console.log(this.i);
 			removeP(this.i);
 		} else { // RMB: link particles
 			if (selP !== null) {
-				console.log('NEW CONSTRAINT');
-				console.log(selP);
-
 				if (selP.i != this.i){ // no self-constraints
 					newC(this, selP);
 				}
-				resetNewC();
 			} else {
-				console.log('SET selP to: ');
-				console.log(this);
-
 				selP = this;
-				newChint.show();
 			}
 		}
 	} else { // running, start drag
@@ -155,7 +145,6 @@ lineHint.prototype.hide = function(){
 	this.elem.style.visibility = "hidden";
 }
 lineHint.prototype.show = function(){
-	this.update(selP, cursor);
 	this.elem.style.visibility = "visible";
 }
 
@@ -168,20 +157,13 @@ function updateCursor(e){
 		e.clientX - rect.left,
 		e.clientY - rect.top
 		];
+	updateNewC();
 }
 function mousemoveHandler(e){
 	updateCursor(e);
 
 	//console.log(cursor);
 
-	if (selP !== null) {
-		// update new constraint line hint
-		if (ovrP !== null){
-			newChint.update(selP.q, ovrP.q);
-		} else {
-			newChint.update(selP.q, cursor);
-		}
-	}
 }
 function mouseupHandler(e){
 	updateCursor(e);
@@ -191,7 +173,6 @@ function mouseupHandler(e){
 function mousedownHandler(e){
 	updateCursor(e);
 
-	console.log("world clicked");
 	if(e.which > 1 && timestepper == null){
 		if(selP !== null){
 			newP(1, cursor, [0, 0]);
@@ -199,7 +180,6 @@ function mousedownHandler(e){
 		} else {
 			newP(1, cursor, [0, 0]);
 		}
-		resetNewC();
 	}
 }
 
@@ -209,7 +189,7 @@ function keydownHandler(e){
 		timetoggle();
 	}
 	if (e.which == 27){ // ESC
-		resetNewC();
+		selP = null;
 	}
 }
 
@@ -217,6 +197,7 @@ var W;
 
 var P = []; var pindex = 0;
 var C = []; var cindex = 0;
+var NOG = []; // particles not influenced by gravity
 
 var selP = null; // last particle selected
 var ovrP = null; // mouse over this particle
@@ -231,14 +212,23 @@ function newC(A, B){
 	C[cindex] = new distConstraint(cindex, A, B);
 	C[cindex].update();
 	++cindex;
-}
-function resetNewC(){
 	selP = null;
-	newChint.hide();
+}
+function updateNewC(){
+	if (selP === null){
+		// do nothing
+		newChint.hide();
+	} else {
+		newChint.show();
+		if (ovrP !== null){
+			newChint.update(selP.q, ovrP.q);
+		} else {
+			newChint.update(selP.q, cursor);
+		}
+	}
 }
 
 function removeP(i){
-	console.log('REMOVEi P ' + P[i].i);
 	P[i].elem.parentNode.removeChild(P[i].elem);
 	for(var j = 0; j < P[i].constraints.length; ++j){
 		if(P[i].constraints[j] != null){
@@ -248,7 +238,6 @@ function removeP(i){
 	P[i] = null;
 }
 function removeC(i){
-	console.log('REMOVE C: ' + C[i].i);
 	C[i].elem.parentNode.removeChild(C[i].elem);
 	C[i].A.constraints[C[i].targAi] = null;
 	C[i].B.constraints[C[i].targBi] = null;
@@ -271,7 +260,11 @@ function dragstop(){
 }
 
 var timestepper  = null;
-function timestart(){ timestepper = window.setInterval(timestep, 10); }
+function timestart(){
+	selP = null;
+	updateNewC();
+       	timestepper = window.setInterval(timestep, dt/0.1);
+}
 function timepause(){
 	window.clearInterval(timestepper);
 	timestepper = null;
@@ -279,54 +272,108 @@ function timepause(){
 }
 function timetoggle(){
 	if(timestepper == null){ timestart(); }
-	else { timepause(); }
+	else { timepause(); selP = null; ovrP = null;  }
+}
+
+
+function newBox(q){
+	beginpindex = pindex;
+	newP(1, sum(q, [20, 20]), [0, 0]);
+	newP(1, sum(q, [-20, 20]), [0, 0]);
+	newP(1, sum(q, [-20, -20]), [0, 0]);
+	newP(1, sum(q, [20, -20]), [0, 0]);
+
+	newC(P[beginpindex  ], P[beginpindex+1]);
+	newC(P[beginpindex+1], P[beginpindex+2]);
+	newC(P[beginpindex+2], P[beginpindex+3]);
+	newC(P[beginpindex+3], P[beginpindex  ]);
+
+	newC(P[beginpindex  ], P[beginpindex+2]);
+	newC(P[beginpindex+1], P[beginpindex+3]);
+}
+function newMesh(q, r, n){
+	var beginpi = pindex;
+	newP(0, sum(q, [0, -r]), [0, 0]); NOG[pindex-1] = true;
+	newP(0, sum(q, [n*r-r, -r]), [0, 0]); NOG[pindex-1] = true;
+	for(var j = 0; j < n; ++j){
+	for(var i = 0; i < n; ++i){
+		beginpindex = pindex;
+		newP(1, sum(q, [i*r, j*r]), [0, 0]);
+		if (i > 0){
+			newC(P[beginpindex], P[beginpindex-1]);
+		}
+		if (j > 0){
+			newC(P[beginpindex], P[beginpindex-n]);
+		}
+		++beginpindex;
+	}}
+	newC(P[beginpi], P[beginpi+2]);
+	newC(P[beginpi+1], P[beginpi+1+n]);
+}
+
+function newPendulum(q, r, n){
+	newP(0, q, [0, 0]); NOG[pindex-1] = true;
+	for(var i = 1; i < n; ++i){
+		newP(1, sum(q, [0, i*r]), [0, 0]);
+		newC(P[pindex-1], P[pindex-2]);
+	}
+	newP(1, sum(q, [-0.4*r, (n+0.4)*r]), [0, 0]);
+	newC(P[pindex-1], P[pindex-2]);
+	newP(1, sum(q, [+0.4*r, (n+0.4)*r]), [0, 0]);
+	newC(P[pindex-1], P[pindex-3]);
+	newC(P[pindex-1], P[pindex-2]);
+}
+
+function newSphere(q, r, n){
+	anginc = 2*Math.PI/n;
+	for(i = 0; i < n; ++i){
+		newP(1, sum(q, 
+		[
+		r*Math.sin((i+0.5)*anginc),
+		r*Math.cos((i+0.5)*anginc)
+		]
+		), [0, 0]);
+	}
+	for(i = 0; i < n-1; ++i){
+		newC(P[pindex-i-1], P[pindex-i-2]);
+	}
+	newC(P[pindex-1], P[pindex-n]);
+
+	for(i = 0; i < n-3; ++i){
+		newC(P[pindex-i-1], P[pindex-i-4]);
+	}
+	newC(P[pindex-1], P[pindex-n+2]);
+	newC(P[pindex-2], P[pindex-n+1]);
+	newC(P[pindex-3], P[pindex-n  ]);
 }
 	
 function init(){
 
 	//setup
 	W = document.getElementById('world');
+	newChint = new lineHint();
+
 	W.addEventListener('mousemove', mousemoveHandler);
 	W.addEventListener('mousedown', mousedownHandler);
 	W.addEventListener('mouseup', mouseupHandler);
 	W.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 	window.addEventListener('keydown', keydownHandler);
 
-	newChint = new lineHint();
-	//initial conditions
-	// P[pindex] = new particle(pindex, 1, [100, 100], [0, -10]); ++pindex;
-	// P[pindex] = new particle(pindex, 1, [200, 200], [0, 0]); ++pindex;
-	// P[pindex] = new particle(pindex, 1, [200, 300], [0, 0]); ++pindex;
 
-	// P[pindex] = new particle(pindex, 1, [240, 320], [0, 0]); ++pindex;
-	// P[pindex] = new particle(pindex, 1, [240, 280], [0, 0]); ++pindex;
+	newBox([100, 600]);
+	newBox([200, 600]);
+	newBox([300, 600]);
 
-	// C[cindex] = new distConstraint(cindex, P[0], P[1]); ++cindex;
-	// C[cindex] = new distConstraint(cindex, P[1], P[2]); ++cindex;
+	newMesh([80, 360], 18, 10);
 
-	// C[cindex] = new distConstraint(cindex, P[2], P[3]); ++cindex;
-	// C[cindex] = new distConstraint(cindex, P[2], P[4]); ++cindex;
-	// C[cindex] = new distConstraint(cindex, P[3], P[4]); ++cindex;
+	newPendulum([390, 100], 36, 8);
 
-
-	newP(1, [100, 100], [0, -10]);
-	newP(1, [200, 200], [0, 0]);
-	newP(1, [200, 300], [0, 0]);
-
-	newP(1, [240, 320], [0, 0]);
-	newP(1, [240, 280], [0, 0]);
-
-	newC(P[0], P[1]);
-	newC(P[1], P[2]);
-
-	newC(P[2], P[3]);
-	newC(P[2], P[4]);
-	newC(P[3], P[4]);
+	newSphere([540, 620], 96, 16);
 
 	timestart()
 }
 
-var iters = 4;
+var iters = 16;
 function timestep(){
 	for(var i = 0; i < P.length; ++i){ if(P[i] != null){ P[i].collide(); }}
 
