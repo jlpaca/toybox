@@ -67,6 +67,14 @@ h2 { font-size: 18px; }
 
 	transform-origin: 0px 50%;
 }
+.linehint {
+	position: absolute;
+	top: -1px;
+	left: 0;
+	
+	border-top: 2px dashed #666;
+	transform-origin: 0px 50%;
+}
 
 </style>
 <script src = "v.js"></script>
@@ -125,9 +133,20 @@ particle.prototype.collide = function(){
 
 }
 
-particle.prototype.mouseoverHandler = function(e){ this.elem.className = "particle particleHL"; }
-particle.prototype.mouseoutHandler = function(e){ this.elem.className = "particle";}
+particle.prototype.mouseoverHandler = function(e){
+	updateCursor(e);
+
+	ovrP = this;
+	this.elem.className = "particle particleHL";
+}
+particle.prototype.mouseoutHandler = function(e){
+	updateCursor(e);
+
+	ovrP = null;
+	this.elem.className = "particle";
+}
 particle.prototype.mousedownHandler = function(e){
+	updateCursor(e);
 	
 	e.stopPropagation()
 	console.log("particle " + this.elem.id + " clicked");
@@ -137,15 +156,20 @@ particle.prototype.mousedownHandler = function(e){
 			console.log(this.i);
 			removeP(this.i);
 		} else { // RMB: link particles
-			if (selP !== null && selP !== this) {
+			if (selP !== null) {
 				console.log('NEW CONSTRAINT');
 				console.log(selP);
-				newC(this, selP);
-				selP = null;
+
+				if (selP.i != this.i){ // no self-constraints
+					newC(this, selP);
+				}
+				resetNewC();
 			} else {
 				console.log('SET selP to: ');
 				console.log(this);
+
 				selP = this;
+				newChint.show();
 			}
 		}
 	} else { // running, start drag
@@ -191,32 +215,83 @@ distConstraint.prototype.solve = function(){
 	this.B.q = sum(this.B.q, mul((1-ratio)*err, unit(d)));
 }
 
+var lineHint = function(){
+
+	this.render();
+	this.elem = document.getElementById('linehint');
+}
+lineHint.prototype.render = function(){
+	var div = document.createElement('div');
+	div.id = 'linehint';
+	div.className = 'linehint';
+	W.appendChild(div);
+}
+lineHint.prototype.update = function(x1, x2){
+	var d = sub(x1, x2);
+	this.elem.style.transform = "translate(" +
+		(x2[0]) + "px,"+ (x2[1]) + "px) " +
+		"rotate(" + Math.atan2(d[1], d[0]) + "rad )";
+	this.elem.style.width =  mag(d) + 'px';
+}
+lineHint.prototype.hide = function(){
+	this.elem.style.visibility = "hidden";
+}
+lineHint.prototype.show = function(){
+	this.update(selP, cursor);
+	this.elem.style.visibility = "visible";
+}
+
 
 var cursor = [0, 0];
-function mousemoveHandler(e){
+function updateCursor(e){
 	var rect;
 	rect = W.getBoundingClientRect();
 	cursor = [
 		e.clientX - rect.left,
 		e.clientY - rect.top
-			];
+		];
+}
+function mousemoveHandler(e){
+	updateCursor(e);
+
 	//console.log(cursor);
+
+	if (selP !== null) {
+		// update new constraint line hint
+		if (ovrP !== null){
+			newChint.update(selP.q, ovrP.q);
+		} else {
+			newChint.update(selP.q, cursor);
+		}
+	}
 }
 function mouseupHandler(e){
+	updateCursor(e);
+
 	dragstop();
 }
 function mousedownHandler(e){
+	updateCursor(e);
+
 	console.log("world clicked");
-	if(e.which > 1){
-		selP = null;
-		newP(1, cursor, [0, 0]);
+	if(e.which > 1 && timestepper == null){
+		if(selP !== null){
+			newP(1, cursor, [0, 0]);
+			newC(selP, P[pindex-1]);
+		} else {
+			newP(1, cursor, [0, 0]);
+		}
+		resetNewC();
 	}
 }
 
 function keydownHandler(e){
-	// console.log(e.which);
-	if (e.which == 32){
+	console.log(e.which);
+	if (e.which == 32){ // SPACEBAR
 		timetoggle();
+	}
+	if (e.which == 27){ // ESC
+		resetNewC();
 	}
 }
 
@@ -226,6 +301,8 @@ var P = []; var pindex = 0;
 var C = []; var cindex = 0;
 
 var selP = null; // last particle selected
+var ovrP = null; // mouse over this particle
+var newChint = null; // will be initialised when page ready
 
 function newP(m, q, v){
 	P[pindex] = new particle(pindex, m, q, v);
@@ -236,6 +313,10 @@ function newC(A, B){
 	C[cindex] = new distConstraint(cindex, A, B);
 	C[cindex].update();
 	++cindex;
+}
+function resetNewC(){
+	selP = null;
+	newChint.hide();
 }
 
 function removeP(i){
@@ -293,6 +374,7 @@ function init(){
 	W.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 	window.addEventListener('keydown', keydownHandler);
 
+	newChint = new lineHint();
 	//initial conditions
 	// P[pindex] = new particle(pindex, 1, [100, 100], [0, -10]); ++pindex;
 	// P[pindex] = new particle(pindex, 1, [200, 200], [0, 0]); ++pindex;
