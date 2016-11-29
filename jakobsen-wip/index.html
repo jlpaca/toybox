@@ -10,6 +10,8 @@ html, body {
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
+
+	cursor: default;
 }
 h2 { font-size: 18px; }
 
@@ -84,9 +86,9 @@ var particle = function(index, mass, coord, velo){
 
 	this.constraints = [];
 
-	this.elem.addEventListener('mouseover', this.mouseoverHandler);
-	this.elem.addEventListener('mouseout', this.mouseoutHandler);
-	this.elem.addEventListener('mousedown', this.mousedownHandler);
+	this.elem.addEventListener('mouseover', this.mouseoverHandler.bind(this));
+	this.elem.addEventListener('mouseout', this.mouseoutHandler.bind(this));
+	this.elem.addEventListener('mousedown', this.mousedownHandler.bind(this));
 	//this.elem.addEventListener('mouseup', this.mouseupHandler);
 }
 particle.prototype.render = function(){
@@ -123,27 +125,33 @@ particle.prototype.collide = function(){
 
 }
 
-particle.prototype.mouseoverHandler = function(e){ this.className = "particle particleHL"; }
-particle.prototype.mouseoutHandler = function(e){ this.className = "particle";}
+particle.prototype.mouseoverHandler = function(e){ this.elem.className = "particle particleHL"; }
+particle.prototype.mouseoutHandler = function(e){ this.elem.className = "particle";}
 particle.prototype.mousedownHandler = function(e){
 	
 	e.stopPropagation()
-	console.log("particle " + this.id + " clicked");
+	console.log("particle " + this.elem.id + " clicked");
 
 	if (timestepper == null) { // edit mode, edit
-
+		if (e.which == 1) { // LMB: remove particle
+			console.log(this.i);
+			removeP(this.i);
+		} else { // RMB: link particles
+			if (selP !== null && selP !== this) {
+				console.log('NEW CONSTRAINT');
+				console.log(selP);
+				newC(this, selP);
+				selP = null;
+			} else {
+				console.log('SET selP to: ');
+				console.log(this);
+				selP = this;
+			}
+		}
 	} else { // running, start drag
-		var i = this.id.substring(1);
-		dragstart(i);
+		dragstart(this.i);
 	}
 }
-/*
-particle.prototype.mouseupHandler = function(e){
-	var i = this.id.substring(1);
-	dragTarget = -1;
-	P[i].mass = dragMass;
-}
-*/
 
 
 var distConstraint = function(index, targA, targB){
@@ -199,6 +207,10 @@ function mouseupHandler(e){
 }
 function mousedownHandler(e){
 	console.log("world clicked");
+	if(e.which > 1){
+		selP = null;
+		newP(1, cursor, [0, 0]);
+	}
 }
 
 function keydownHandler(e){
@@ -213,8 +225,21 @@ var W;
 var P = []; var pindex = 0;
 var C = []; var cindex = 0;
 
+var selP = null; // last particle selected
+
+function newP(m, q, v){
+	P[pindex] = new particle(pindex, m, q, v);
+	P[pindex].update(); // for feedback during pause
+	++pindex;
+}
+function newC(A, B){
+	C[cindex] = new distConstraint(cindex, A, B);
+	C[cindex].update();
+	++cindex;
+}
+
 function removeP(i){
-	//console.log('REMOVEi P ' + P[i].i);
+	console.log('REMOVEi P ' + P[i].i);
 	P[i].elem.parentNode.removeChild(P[i].elem);
 	for(var j = 0; j < P[i].constraints.length; ++j){
 		if(P[i].constraints[j] != null){
@@ -224,15 +249,14 @@ function removeP(i){
 	P[i] = null;
 }
 function removeC(i){
-	//console.log('REMOVE C: ' + C[i].i);
+	console.log('REMOVE C: ' + C[i].i);
 	C[i].elem.parentNode.removeChild(C[i].elem);
 	C[i].A.constraints[C[i].targAi] = null;
 	C[i].B.constraints[C[i].targBi] = null;
 	C[i] = null;
 }
 
-
-var g = [0, 4];
+var g = [0, 0.04/dt/dt];
 
 var dragTarget = -1; var dragMass = 1;
 function dragstart(i){
@@ -266,34 +290,50 @@ function init(){
 	W.addEventListener('mousemove', mousemoveHandler);
 	W.addEventListener('mousedown', mousedownHandler);
 	W.addEventListener('mouseup', mouseupHandler);
+	W.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 	window.addEventListener('keydown', keydownHandler);
 
 	//initial conditions
-	P[pindex] = new particle(pindex, 1, [100, 100], [0, -10]); ++pindex;
-	P[pindex] = new particle(pindex, 1, [200, 200], [0, 0]); ++pindex;
-	P[pindex] = new particle(pindex, 1, [200, 300], [0, 0]); ++pindex;
+	// P[pindex] = new particle(pindex, 1, [100, 100], [0, -10]); ++pindex;
+	// P[pindex] = new particle(pindex, 1, [200, 200], [0, 0]); ++pindex;
+	// P[pindex] = new particle(pindex, 1, [200, 300], [0, 0]); ++pindex;
 
-	P[pindex] = new particle(pindex, 1, [240, 320], [0, 0]); ++pindex;
-	P[pindex] = new particle(pindex, 1, [240, 280], [0, 0]); ++pindex;
+	// P[pindex] = new particle(pindex, 1, [240, 320], [0, 0]); ++pindex;
+	// P[pindex] = new particle(pindex, 1, [240, 280], [0, 0]); ++pindex;
 
-	C[cindex] = new distConstraint(cindex, P[0], P[1]); ++cindex;
-	C[cindex] = new distConstraint(cindex, P[1], P[2]); ++cindex;
+	// C[cindex] = new distConstraint(cindex, P[0], P[1]); ++cindex;
+	// C[cindex] = new distConstraint(cindex, P[1], P[2]); ++cindex;
 
-	C[cindex] = new distConstraint(cindex, P[2], P[3]); ++cindex;
-	C[cindex] = new distConstraint(cindex, P[2], P[4]); ++cindex;
-	C[cindex] = new distConstraint(cindex, P[3], P[4]); ++cindex;
+	// C[cindex] = new distConstraint(cindex, P[2], P[3]); ++cindex;
+	// C[cindex] = new distConstraint(cindex, P[2], P[4]); ++cindex;
+	// C[cindex] = new distConstraint(cindex, P[3], P[4]); ++cindex;
+
+
+	newP(1, [100, 100], [0, -10]);
+	newP(1, [200, 200], [0, 0]);
+	newP(1, [200, 300], [0, 0]);
+
+	newP(1, [240, 320], [0, 0]);
+	newP(1, [240, 280], [0, 0]);
+
+	newC(P[0], P[1]);
+	newC(P[1], P[2]);
+
+	newC(P[2], P[3]);
+	newC(P[2], P[4]);
+	newC(P[3], P[4]);
 
 	timestart()
 }
 
 var iters = 4;
 function timestep(){
-	for(var i = 0; i < P.length; ++i){ if(P[i] != null){ P[i].integrate(); }}
 	for(var i = 0; i < P.length; ++i){ if(P[i] != null){ P[i].collide(); }}
 
 	for(var j = 0; j < iters; ++j){
 		for(var i = 0; i < C.length; ++i){ if(C[i] != null){ C[i].solve(); }}
 	}
+	for(var i = 0; i < P.length; ++i){ if(P[i] != null){ P[i].integrate(); }}
 
 	for(var i = 0; i < P.length; ++i){ if(P[i] != null){ P[i].update(); }}
 	for(var i = 0; i < C.length; ++i){ if(C[i] != null){ C[i].update(); }}
