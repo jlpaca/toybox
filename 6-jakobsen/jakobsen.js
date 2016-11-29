@@ -1,3 +1,26 @@
+function HSVtoHex(h, s, v){
+	var r, g, b, i, f, p, q, t;
+	i = Math.floor(h*6);
+	f = h*6-i;
+	p = v*(1-s);
+	q = v*(1-f*s);
+	t = v*(1-(1-f)*s);
+	switch(i%6){
+		case 0: r = v, g = t, b = p; break;
+		case 1: r = q, g = v, b = p; break;
+		case 2: r = p, g = v, b = t; break;
+		case 3: r = p, g = q, b = v; break;
+		case 4: r = t, g = p, b = v; break;
+		case 5: r = v, g = p, b = q; break;
+	}
+	r = Math.round(r*255);
+	g = Math.round(g*255);
+	b = Math.round(b*255);
+	rhex = r.toString(16); if(rhex.length == 1){ rhex = '0'+rhex; }
+	ghex = g.toString(16); if(ghex.length == 1){ ghex = '0'+ghex; }
+	bhex = b.toString(16); if(bhex.length == 1){ bhex = '0'+bhex; }
+	return '#' + rhex + ghex + bhex;
+}
 var dt = 0.01;
 
 var particle = function(index, mass, coord, velo){
@@ -26,6 +49,16 @@ particle.prototype.render = function(){
 particle.prototype.update = function(){
 	this.elem.style.transform = 'translate(' +
 	(this.q[0]-9) + 'px,' + (this.q[1]-9) + 'px)';
+
+	avg = defaultColour;
+	
+	for(var i = 0; i < this.constraints.length; ++i){
+		if (this.constraints[i] instanceof distConstraint){
+			avg = this.constraints[i].elem.style.backgroundColor;
+			break;
+		}
+	}
+	this.elem.style.backgroundColor = avg;
 }
 particle.prototype.integrate = function(){
 	if(this.i == dragTarget){
@@ -38,6 +71,7 @@ particle.prototype.integrate = function(){
 		this.q = newq;
 	}
 }
+
 
 var boxmargin = 5;
 var boxmin = 0   + boxmargin // must be geq this
@@ -85,7 +119,12 @@ particle.prototype.mousedownHandler = function(e){
 	}
 }
 
-
+//colourt = 0;
+defaultColour = '#73a1e6';
+function colourFromDelta(d){
+	hue = Math.max(0.1, 0.6-Math.sqrt(d)*0.5);
+	return HSVtoHex(hue, 0.5, 0.9);
+}
 var distConstraint = function(index, targA, targB){
 	this.i = index;
 	this.A = targA;
@@ -113,7 +152,9 @@ distConstraint.prototype.update = function(){
 	this.elem.style.transform = "translate(" +
 		(this.A.q[0]) + "px,"+ (this.A.q[1]) + "px) " +
 		"rotate(" + Math.atan2(d[1], d[0]) + "rad )";
-	this.elem.style.width =  mag(d) + 'px';
+	magd = mag(d);
+	this.elem.style.width =  magd+ 'px';
+	this.elem.style.backgroundColor = colourFromDelta(Math.abs(this.L-magd));
 }
 distConstraint.prototype.solve = function(){
 	var d = sub(this.B.q, this.A.q);
@@ -190,6 +231,7 @@ function keydownHandler(e){
 	}
 	if (e.which == 27){ // ESC
 		selP = null;
+		updateNewC();
 	}
 }
 
@@ -304,6 +346,9 @@ function newMesh(q, r, n){
 		}
 		if (j > 0){
 			newC(P[beginpindex], P[beginpindex-n]);
+			//if(i > 0){
+			//newC(P[beginpindex], P[beginpindex-n-1]);
+			//}
 		}
 		++beginpindex;
 	}}
@@ -373,8 +418,10 @@ function init(){
 	timestart()
 }
 
-var iters = 16;
+var iters = 12;
 function timestep(){
+	//colourt += 0.001;
+	//if(colourt > 1){ colourt = 0; }
 	for(var i = 0; i < P.length; ++i){ if(P[i] != null){ P[i].collide(); }}
 
 	for(var j = 0; j < iters; ++j){
