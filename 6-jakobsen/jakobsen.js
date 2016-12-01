@@ -159,7 +159,7 @@ distConstraint.prototype.update = function(){
 distConstraint.prototype.solve = function(){
 	var d = sub(this.B.q, this.A.q);
 	var err = (this.L - mag(d));
-	var ratio = this.A.m/(this.A.m+this.B.m);
+	var ratio = this.A.m+this.B.m == 0 ? 0.5 : this.A.m/(this.A.m+this.B.m);
 	this.A.q = sub(this.A.q, mul(ratio*err, unit(d)));
 	this.B.q = sum(this.B.q, mul((1-ratio)*err, unit(d)));
 }
