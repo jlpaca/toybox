@@ -33,8 +33,8 @@ h2 { font-size: 18px; }
 
 	position: relative;
 
-	width: 512px;
-	height: 512px;
+	width: 720px;
+	height: 720px;
 
 	/*overflow: hidden;*/
 }
@@ -49,13 +49,54 @@ precision highp float;
 
 uniform sampler2D tex;
 
+float DA = 0.9;
+float DB = 0.28;
+
+float f = 0.0367;
+float k = 0.0649;
+
 float TEXSIZE = 512.0;
+float KERNEL_CNTR = -1.0;
+float KERNEL_ADJC = 0.20;
+float KERNEL_DGNL = 0.05;
 void main(){
 	
 	vec2 uv = gl_FragCoord.xy/TEXSIZE;
 	float dx = 1.0/TEXSIZE;
 
-	gl_FragColor = texture2D(tex, uv+dx);//vec4(uv, 0.5, 1.);
+	vec4 c = texture2D(tex, uv);
+
+	// 3x3 convolution
+	float laplA = KERNEL_CNTR*texture2D(tex, uv).r
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2( dx, 0.0)).r
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(-dx, 0.0)).r
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0,  dx)).r
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0, -dx)).r
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx,  dx)).r
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx, -dx)).r
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx, -dx)).r
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx,  dx)).r;
+
+	float laplB = KERNEL_CNTR*texture2D(tex, uv).g
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2( dx, 0.0)).g
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(-dx, 0.0)).g
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0,  dx)).g
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0, -dx)).g
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx,  dx)).g
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx, -dx)).g
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx, -dx)).g
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx,  dx)).g;
+
+
+	float A = c.r;
+	float B = c.g;
+	c.r += DA*laplA - A*B*B + f*(1.0-A); 
+	c.g += DB*laplB + A*B*B - (k+f)*B;
+	c.b = 1.0;
+	c.a = 0.8;
+
+
+	gl_FragColor = c;
 }
 </script>
 <script>
@@ -102,15 +143,17 @@ function initGL(){
 }
 
 function timestep(){
-	swapBuffers();
+	for(var i = 0; i < 24; ++i){
+		swapBuffers();
 
-	drawr();
+		drawr();
+	}
 
 	context.bindFramebuffer(context.FRAMEBUFFER, null);
 
 	drawr();
 
-
+	window.requestAnimationFrame(timestep);
 }
 
 function drawr(){
@@ -166,13 +209,33 @@ function setupfBuffer(tex){
 
 function texgen(){
 	var t = [];
+	var seeds = 16;
+	var cntrx = [];
+	var cntry = [];
+	var radii = [];
+	for(var i = 0; i < seeds; ++i){
+		cntrx.push(Math.random()*L);
+		cntry.push(Math.random()*L);
+		radii.push(Math.random()*L/16);
+	}
 	for(var i = 0; i < L; ++i){
 	for(var j = 0; j < L; ++j){
-		t[4*(j*L+i)  ] = i > L/2 ? 255 : 0;
-		t[4*(j*L+i)+1] = j > L/2 ? 255 : 0;
-		t[4*(j*L+i)+2] = 255;
+
+		var G = false;
+		for(var k = 0; k < seeds; ++k){
+			if ((i-cntrx[k])*(i-cntrx[k]) +
+			    (j-cntry[k])*(j-cntry[k]) <
+			     radii[k]*radii[k]){
+				G = true;
+			}
+		}
+
+		t[4*(j*L+i)  ] = G ? 0 : 255;
+		t[4*(j*L+i)+1] = G ? 255 : 0;
+		t[4*(j*L+i)+2] = 0;
 		t[4*(j*L+i)+3] = 255;
 	}}
+
 	return new Uint8Array(t);
 
 }
@@ -182,12 +245,7 @@ function initSquare(){
 	var vertqloc  = context.getAttribLocation(program, "vertq");
 	context.bindBuffer(context.ARRAY_BUFFER, vertqbuff);
 
-	var squareq = [
-		1, 1,
-		1, -1,
-		-1, 1,
-		-1, -1
-		];
+	var squareq = [	1, 1, 1, -1, -1, 1, -1, -1 ];
 
 	context.bufferData(context.ARRAY_BUFFER,
 			new Float32Array(squareq),
