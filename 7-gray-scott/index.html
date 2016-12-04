@@ -1,0 +1,159 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>Gray-Scott Reaction-Diffusion System</title>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #0e1100;
+	color: #560;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+
+	cursor: default;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+<script id = "vertsource" type = "notjs">
+attribute vec4 vertq;
+void main() { gl_Position = vertq; }
+</script>
+<script id = "fragsource" type = "notjs">
+precision highp float;
+
+uniform sampler2D tex;
+
+uniform float Dr;
+uniform float Dg;
+
+uniform float f;
+uniform float k;
+
+uniform vec3 cursor;
+
+float TEXSIZE = 512.0;
+float KERNEL_CNTR = -1.0;
+float KERNEL_ADJC = 0.20;
+float KERNEL_DGNL = 0.05;
+void main(){
+	
+	vec2 uv = gl_FragCoord.xy/TEXSIZE;
+	float dx = 1.0/TEXSIZE;
+
+	vec4 c = texture2D(tex, uv);
+
+	// 3x3 convolution
+	vec2 lapl = KERNEL_CNTR*c.rg
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2( dx, 0.0)).rg
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(-dx, 0.0)).rg
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0,  dx)).rg
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0, -dx)).rg
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx,  dx)).rg
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx, -dx)).rg
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx, -dx)).rg
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx,  dx)).rg;
+
+	c.r += (Dr*lapl.r - c.r*c.g*c.g + f*(1.0-c.r)); 
+	c.g += (Dg*lapl.g + c.r*c.g*c.g - (k+f)*c.g);
+	c.b = 1.0;
+	c.a = 1.0;
+
+	// override all that if near cursor
+	if (distance(uv, cursor.xy) < cursor.z){
+		c.r = 0.0;
+		c.g = 0.0;
+	}
+
+
+	gl_FragColor = c;
+}
+</script>
+
+<script id = "fragsource2" type = "notjs">
+// pretty things
+
+precision highp float;
+
+uniform sampler2D tex;
+
+float TEXSIZE = 512.0;
+
+vec3 hsv2rgb(vec3 c){
+	vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+	vec3 p = abs(fract(c.xxx + K.xyz)*6.0 - K.www);
+	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+void main(){
+	vec2 uv = gl_FragCoord.xy/TEXSIZE;
+
+	vec3 origc = texture2D(tex, uv).rgb;
+
+	float h = 0.50-origc.g*1.0;
+	float s = 1.0;
+	float v = origc.g/(origc.r+origc.g);
+
+	gl_FragColor = vec4(hsv2rgb(vec3(h, s, v)), 1.0);
+	
+}
+</script>
+<script src = "gray-scott.js" type = "text/javascript"></script>
+</head>
+<body>
+
+<div id = "container">
+	<h2>GRAY-SCOTT REACTION-DIFFUSION SYSTEM</h2>
+
+	<!--<div id = "world"></div>-->
+	<canvas id = "world" width = "512" height = "512"></canvas>
+	<script> initGL(); </script>
+	<div>
+		<p>A two-component reaction-diffusion system, as investigated by A. Turing(1952), P. Gray and S. Scott(1984), among others. Diffusion rates are 0.8, 0.4; preset f and k are 0.37 and 0.60 respectively.</p>
+		
+		<p>Javascript/GLSL. The demo is interactive: the cursor clears the state of the system in its proximity.</p>
+
+	<ul>
+		<li>MOUSEWHEEL: adjust cursor effect radius</li>
+		<li>J/K KEYS: decrease/increase kill rate (k)</li>
+		<li>D/F KEYS: decrease/increase feed rate (f)</li>
+	</div>
+
+	<div id = "credits">
+	J. Lok, December 2016.
+	</div>
+
+</div>
+
+
+</body>
+
+</html>
