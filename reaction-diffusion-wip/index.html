@@ -10,6 +10,8 @@ html, body {
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
+
+	cursor: default;
 }
 h2 { font-size: 18px; }
 
@@ -49,11 +51,11 @@ precision highp float;
 
 uniform sampler2D tex;
 
-float DA = 0.9;
-float DB = 0.28;
+uniform float Dr;
+uniform float Dg;
 
-float f = 0.0367;
-float k = 0.0649;
+uniform float f;
+uniform float k;
 
 float TEXSIZE = 512.0;
 float KERNEL_CNTR = -1.0;
@@ -67,44 +69,47 @@ void main(){
 	vec4 c = texture2D(tex, uv);
 
 	// 3x3 convolution
-	float laplA = KERNEL_CNTR*texture2D(tex, uv).r
-			+ KERNEL_ADJC*texture2D(tex, uv+vec2( dx, 0.0)).r
-			+ KERNEL_ADJC*texture2D(tex, uv+vec2(-dx, 0.0)).r
-			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0,  dx)).r
-			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0, -dx)).r
-			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx,  dx)).r
-			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx, -dx)).r
-			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx, -dx)).r
-			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx,  dx)).r;
+	vec2 lapl = KERNEL_CNTR*c.rg
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2( dx, 0.0)).rg
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(-dx, 0.0)).rg
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0,  dx)).rg
+			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0, -dx)).rg
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx,  dx)).rg
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx, -dx)).rg
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx, -dx)).rg
+			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx,  dx)).rg;
 
-	float laplB = KERNEL_CNTR*texture2D(tex, uv).g
-			+ KERNEL_ADJC*texture2D(tex, uv+vec2( dx, 0.0)).g
-			+ KERNEL_ADJC*texture2D(tex, uv+vec2(-dx, 0.0)).g
-			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0,  dx)).g
-			+ KERNEL_ADJC*texture2D(tex, uv+vec2(0.0, -dx)).g
-			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx,  dx)).g
-			+ KERNEL_DGNL*texture2D(tex, uv+vec2( dx, -dx)).g
-			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx, -dx)).g
-			+ KERNEL_DGNL*texture2D(tex, uv+vec2(-dx,  dx)).g;
-
-
-	float A = c.r;
-	float B = c.g;
-	c.r += DA*laplA - A*B*B + f*(1.0-A); 
-	c.g += DB*laplB + A*B*B - (k+f)*B;
+	c.r += (Dr*lapl.r - c.r*c.g*c.g + f*(1.0-c.r)); 
+	c.g += (Dg*lapl.g + c.r*c.g*c.g - (k+f)*c.g);
 	c.b = 1.0;
-	c.a = 0.8;
+	c.a = 1.0;
 
 
 	gl_FragColor = c;
 }
 </script>
+
+<script id = "fragsource2" type = "notjs">
+precision highp float;
+
+uniform sampler2D tex;
+
+float TEXSIZE = 512.0;
+void main(){
+	vec2 uv = gl_FragCoord.xy/TEXSIZE;
+
+	gl_FragColor = texture2D(tex, uv).rgba;
+	
+}
+</script>
+
 <script>
 
 var canvas;
 var context;
 
 var program;
+var program2;
 
 var texA;
 var fbuffA;
@@ -115,6 +120,13 @@ var texloc;
 
 var L = 512;
 
+// simulation parameters
+var Dr = 0.8;//0.2;
+var Dg = 0.4;//0.1;
+var f = 0.037;
+var k = 0.060;
+
+
 function initGL(){
 	canvas = document.getElementById("world");
 	context = canvas.getContext("webgl");
@@ -124,10 +136,17 @@ function initGL(){
 	var vertshader = createShader(context.VERTEX_SHADER,   vertsource);
 	var fragshader = createShader(context.FRAGMENT_SHADER, fragsource);
 
+	var fragsource2 = document.getElementById("fragsource2").text;
+	var fragshader2 = createShader(context.FRAGMENT_SHADER, fragsource2);
+
 	program = createProgram(vertshader, fragshader);
+	program2 = createProgram(vertshader, fragshader2);
+
 	context.useProgram(program);
 
 	initSquare();
+
+	context.getExtension("OES_texture_float");
 
 	texA = setupTexture(null);
 	fbuffA = setupfBuffer(texA);
@@ -137,20 +156,71 @@ function initGL(){
 
 	texloc = context.getUniformLocation(program, "tex");
 
+	bindHandlers();
+
 	timestep();
 
 	
 }
 
+var cursor = [0, 0];
+var kincrement = 0;
+var fincrement = 0;
+function keydownHandler(e){
+	console.log(e.which);
+	if (e.which == 70){ fincrement =  0.0004;	} // F KEY
+	if (e.which == 68){ fincrement = -0.0004;	} // D KEY
+	if (e.which == 75){ kincrement =  0.0004;	} // K KEY
+	if (e.which == 74){ kincrement = -0.0004;	} // J KEY
+
+}
+function keyupHandler(e){
+	//console.log(e.which + "UP");
+	if (e.which == 70){ fincrement = 0; } // F KEY
+	if (e.which == 68){ fincrement = 0; } // D KEY
+	if (e.which == 75){ kincrement = 0; } // K KEY
+	if (e.which == 74){ kincrement = 0; } // J KEY
+}
+
+var Drloc, Dgloc, kloc, floc;
+function bindHandlers(){
+	Drloc = context.getUniformLocation(program, "Dr");
+	Dgloc = context.getUniformLocation(program, "Dg");
+	kloc = context.getUniformLocation(program, "k");
+	floc = context.getUniformLocation(program, "f");
+
+	window.addEventListener('keydown', keydownHandler);
+	window.addEventListener('keyup',   keyupHandler  );
+}
+function passParams(){
+	context.uniform1f(Drloc, Dr);
+	context.uniform1f(Dgloc, Dg);
+	context.uniform1f(kloc, k);
+	context.uniform1f(floc, f);
+}
+
+var iter = 16;
 function timestep(){
-	for(var i = 0; i < 24; ++i){
+
+	// user interaction
+	f += fincrement;
+	k += kincrement;
+	if (fincrement != 0 || kincrement != 0){
+		console.log("f: " + f.toFixed(4) +
+			  "  k: " + k.toFixed(4));
+	}
+
+	// timestep the simulation
+	context.useProgram(program);
+	passParams();
+	for(var i = 0; i < iter; ++i){
 		swapBuffers();
 
 		drawr();
 	}
 
+	context.useProgram(program2);
 	context.bindFramebuffer(context.FRAMEBUFFER, null);
-
 	drawr();
 
 	window.requestAnimationFrame(timestep);
@@ -168,7 +238,7 @@ function setupTexture(data){
 	context.bindTexture(context.TEXTURE_2D, tex);
 	context.texImage2D(context.TEXTURE_2D, 0, context.RGBA,
 					 L, L, 0, context.RGBA,
-					 context.UNSIGNED_BYTE, data);
+					 context.FLOAT, data); // use floating point texture
 	context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S, context.REPEAT);
 	context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.REPEAT);
 	context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.NEAREST);
@@ -208,15 +278,16 @@ function setupfBuffer(tex){
 
 
 function texgen(){
+	
 	var t = [];
-	var seeds = 16;
+	var seeds = 64;
 	var cntrx = [];
 	var cntry = [];
 	var radii = [];
 	for(var i = 0; i < seeds; ++i){
 		cntrx.push(Math.random()*L);
 		cntry.push(Math.random()*L);
-		radii.push(Math.random()*L/16);
+		radii.push(Math.random()*L/32);
 	}
 	for(var i = 0; i < L; ++i){
 	for(var j = 0; j < L; ++j){
@@ -230,13 +301,29 @@ function texgen(){
 			}
 		}
 
-		t[4*(j*L+i)  ] = G ? 0 : 255;
-		t[4*(j*L+i)+1] = G ? 255 : 0;
+		t[4*(j*L+i)  ] = G ? 0 : 1;
+		t[4*(j*L+i)+1] = G ? 1 : 0;
 		t[4*(j*L+i)+2] = 0;
-		t[4*(j*L+i)+3] = 255;
+		t[4*(j*L+i)+3] = 1;
 	}}
-
-	return new Uint8Array(t);
+	/* 
+	var t = [];
+	var R = L/190; var A = true;
+	for(var i = 0; i < L; ++i){
+	for(var j = 0; j < L; ++j){
+		A = true;
+		if ((i-L/2)*(i-L/2) +
+		    (j-L/2)*(j-L/2) <
+		     R*R){
+			A = false;
+		}
+		t[4*(j*L+i)  ] = A ? 1 : 0;
+		t[4*(j*L+i)+1] = A ? 0 : 1;
+		t[4*(j*L+i)+2] = 0;
+		t[4*(j*L+i)+3] = 1;
+	}}
+	*/
+	return new Float32Array(t);//new Uint8Array(t);
 
 }
 
@@ -260,7 +347,7 @@ function createShader(type, source){
 	var shader = context.createShader(type);
 	context.shaderSource(shader, source);
 	context.compileShader(shader);
-	console.log(context.getShaderInfoLog(shader));
+	//console.log(context.getShaderInfoLog(shader));
 	return shader;
 }
 
@@ -270,7 +357,7 @@ function createProgram(vertshader, fragshader){
 	context.attachShader(program, fragshader);
 	context.linkProgram(program);
 
-	console.log(context.getProgramInfoLog(program));
+	//console.log(context.getProgramInfoLog(program));
 	return program;
 }
 
