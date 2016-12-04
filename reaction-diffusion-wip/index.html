@@ -58,6 +58,8 @@ uniform float Dg;
 uniform float f;
 uniform float k;
 
+uniform vec3 cursor;
+
 float TEXSIZE = 512.0;
 float KERNEL_CNTR = -1.0;
 float KERNEL_ADJC = 0.20;
@@ -84,6 +86,12 @@ void main(){
 	c.g += (Dg*lapl.g + c.r*c.g*c.g - (k+f)*c.g);
 	c.b = 1.0;
 	c.a = 1.0;
+
+	// override all that if near cursor
+	if (distance(uv, cursor.xy) < cursor.z){
+		c.r = 0.0;
+		c.g = 0.0;
+	}
 
 
 	gl_FragColor = c;
@@ -179,7 +187,7 @@ function initGL(){
 	
 }
 
-var cursor = [0, 0];
+var cursor = [0.5, 0.5, 0.03];
 var kincrement = 0;
 var fincrement = 0;
 function keydownHandler(e){
@@ -197,22 +205,39 @@ function keyupHandler(e){
 	if (e.which == 75){ kincrement = 0; } // K KEY
 	if (e.which == 74){ kincrement = 0; } // J KEY
 }
+function mousemoveHandler(e){
+	var rect = document.getElementById('world').getBoundingClientRect()
+	cursor[0] =     (e.clientX - rect.left)/rect.width;
+	cursor[1] = 1.0-(e.clientY - rect.top)/rect.height;
+}
+function wheelHandler(e){
+	if (e.deltaY < 0) {
+		cursor[2] += 0.02;
+	} else {
+		cursor[2] -= 0.02;
+	}
+	cursor[2] = Math.min(Math.max(0.01, cursor[2]), 0.16);
+}
 
-var Drloc, Dgloc, kloc, floc;
+var Drloc, Dgloc, kloc, floc, cursorloc;
 function bindHandlers(){
 	Drloc = context.getUniformLocation(program, "Dr");
 	Dgloc = context.getUniformLocation(program, "Dg");
 	kloc = context.getUniformLocation(program, "k");
 	floc = context.getUniformLocation(program, "f");
+	cursorloc = context.getUniformLocation(program, "cursor");
 
 	window.addEventListener('keydown', keydownHandler);
 	window.addEventListener('keyup',   keyupHandler  );
+	document.addEventListener('mousemove', mousemoveHandler);
+	document.addEventListener('wheel', wheelHandler);
 }
 function passParams(){
 	context.uniform1f(Drloc, Dr);
 	context.uniform1f(Dgloc, Dg);
 	context.uniform1f(kloc, k);
 	context.uniform1f(floc, f);
+	context.uniform3f(cursorloc, cursor[0], cursor[1], cursor[2]);
 }
 
 var iter = 16;
@@ -390,7 +415,14 @@ function createProgram(vertshader, fragshader){
 	<canvas id = "world" width = "512" height = "512"></canvas>
 	<script> initGL(); </script>
 	<div>
+		<p>A two-component reaction-diffusion system, as investigated by A. Turing(1952), P. Gray and S. Scott(1984), among others. Diffusion rates are 0.8, 0.4; preset f and k are 0.37 and 0.60 respectively.</p>
+		
+		<p>Javascript/GLSL. The demo is interactive: the cursor clears the state of the system in its proximity.</p>
 
+	<ul>
+		<li>MOUSEWHEEL: adjust cursor effect radius</li>
+		<li>J/K KEYS: decrease/increase kill rate (k)</li>
+		<li>D/F KEYS: decrease/increase feed rate (f)</li>
 	</div>
 
 	<div id = "credits">
