@@ -1,12 +1,13 @@
 <!DOCTYPE HTML>
 <html>
 <head>
+<title>Gray-Scott Reaction-Diffusion System</title>
 <link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
 <style>
 html, body {
 	margin: 0; padding: 0;
-	background-color: #fff;
-	color: #999;
+	background-color: #0e1100;
+	color: #560;
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
@@ -90,15 +91,30 @@ void main(){
 </script>
 
 <script id = "fragsource2" type = "notjs">
+// pretty things
+
 precision highp float;
 
 uniform sampler2D tex;
 
 float TEXSIZE = 512.0;
+
+vec3 hsv2rgb(vec3 c){
+	vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+	vec3 p = abs(fract(c.xxx + K.xyz)*6.0 - K.www);
+	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 void main(){
 	vec2 uv = gl_FragCoord.xy/TEXSIZE;
 
-	gl_FragColor = texture2D(tex, uv).rgba;
+	vec3 origc = texture2D(tex, uv).rgb;
+
+	float h = 0.50-origc.g*1.0;
+	float s = 1.0;
+	float v = origc.g/(origc.r+origc.g);
+
+	gl_FragColor = vec4(hsv2rgb(vec3(h, s, v)), 1.0);
 	
 }
 </script>
@@ -368,7 +384,7 @@ function createProgram(vertshader, fragshader){
 <body>
 
 <div id = "container">
-	<h2>POLYGONS</h2>
+	<h2>GRAY-SCOTT REACTION-DIFFUSION SYSTEM</h2>
 
 	<!--<div id = "world"></div>-->
 	<canvas id = "world" width = "512" height = "512"></canvas>
@@ -378,7 +394,7 @@ function createProgram(vertshader, fragshader){
 	</div>
 
 	<div id = "credits">
-	J. Lok, April 2016.
+	J. Lok, December 2016.
 	</div>
 
 </div>
