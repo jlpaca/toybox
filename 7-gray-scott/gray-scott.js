@@ -61,10 +61,10 @@ var kincrement = 0;
 var fincrement = 0;
 function keydownHandler(e){
 	console.log(e.which);
-	if (e.which == 70){ fincrement =  0.0004;	} // F KEY
-	if (e.which == 68){ fincrement = -0.0004;	} // D KEY
-	if (e.which == 75){ kincrement =  0.0004;	} // K KEY
-	if (e.which == 74){ kincrement = -0.0004;	} // J KEY
+	if (e.which == 70){ fincrement =  0.0002;	} // F KEY
+	if (e.which == 68){ fincrement = -0.0002;	} // D KEY
+	if (e.which == 75){ kincrement =  0.0002;	} // K KEY
+	if (e.which == 74){ kincrement = -0.0002;	} // J KEY
 
 }
 function keyupHandler(e){
