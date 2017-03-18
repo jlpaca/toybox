@@ -1,0 +1,161 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc dashed;
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+<script>
+// v4.js
+function v4dot(u, v){ return u[0]*v[0]+u[1]*v[1]+u[2]*v[2]; }
+function v4mul(a, v){ return v[0]?[a*v[0], a*v[1], a*v[2], 1]:v4mul(v, a); }
+
+function v4x(u, v){ return [
+	u[1]*v[2]-v[1]*u[2],
+	u[2]*v[0]-v[2]*u[0],
+	u[0]*v[1]-v[0]*u[1], 1]; }
+
+function v4add(u, v){ return [u[0]+v[0], u[1]+v[1], u[2]+v[2], 1]; }
+function v4sub(u, v){ return [u[0]-v[0], u[1]-v[1], u[2]-v[2], 1]; }
+
+function v4mag2(u){ return u[0]*u[0]+u[1]*u[1]+u[2]*u[2]; }
+function v4mag(u){ return Math.sqrt(u[0]*u[0]+u[1]*u[1]+u[2]*u[2]); }
+
+function v4unit(u){ return v4mul(1/v4mag(u), u); }
+</script>
+<script>
+// lindenmayer.js
+var world;
+var context;
+function init(){
+	canvas = document.getElementById("world");
+	context = canvas.getContext('2d');
+
+	context.lineWidth = 2;
+
+	timestep();
+}
+
+var camera = {
+	z: 1,			// depth
+	q: [5, 0, 5, 1],	// location
+	d: v4unit([1, 0, 1, 1]),	// direction vector
+	u: [0, 1, 0, 1],	// up vector
+	near: 1,
+	far: 100
+}
+	
+function project(q3d, cam){
+	var x = v4dot(v4x(cam.u, cam.d), v4sub(q3d, cam.q));
+	var y = v4dot(cam.u, v4sub(q3d, cam.q));
+	var z = cam.z-v4dot(cam.d, v4sub(q3d, cam.q));
+
+	if (z < cam.near || z > cam.far) { return [0, 0];}
+	return [
+		(1+cam.z/(cam.z+z)*x)/2*canvas.clientWidth,
+		(1-cam.z/(cam.z+z)*y)/2*canvas.clientHeight
+	];
+}
+
+function line(a, b){
+	context.beginPath();
+	var a2d = project(a, camera);
+	var b2d = project(b, camera);
+	context.moveTo(a2d[0], a2d[1]);
+	context.lineTo(b2d[0], b2d[1]);
+	context.stroke();
+}
+
+function unitbox(x, y, z) {
+
+	line([x+1, y+1, z+1], [x-1, y+1, z+1]);
+	line([x-1, y+1, z+1], [x-1, y-1, z+1]);
+	line([x-1, y-1, z+1], [x+1, y-1, z+1]);
+	line([x+1, y-1, z+1], [x+1, y+1, z+1]);
+	
+	line([x+1, y+1, z-1], [x-1, y+1, z-1]);
+	line([x-1, y+1, z-1], [x-1, y-1, z-1]);
+	line([x-1, y-1, z-1], [x+1, y-1, z-1]);
+	line([x+1, y-1, z-1], [x+1, y+1, z-1]);
+	
+	line([x+1, y+1, z+1], [x+1, y+1, z-1]);
+	line([x-1, y+1, z+1], [x-1, y+1, z-1]);
+	line([x-1, y-1, z+1], [x-1, y-1, z-1]);
+	line([x+1, y-1, z+1], [x+1, y-1, z-1]);
+}
+function render() {
+	context.clearRect(0, 0, canvas.width, canvas.height);
+
+	for (var i = 0; i <10; ++i) {
+		unitbox(0, 2.1*i, 0);
+	}
+}
+
+
+var t = 0;
+function timestep(){
+	t = t + 0.01;
+	render();
+	camera.q = [ 10*Math.sin(t), 10, 10*Math.cos(t), 1];
+	camera.d = v4unit([ Math.sin(t), 0, Math.cos(t), 1 ]);
+	window.requestAnimationFrame(timestep);
+}
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>TITLE</h2>
+
+	<canvas id = "world" width = "720" height = "720"></canvas>
+
+	<script>init();</script>
+
+	<div><p>description.</p></div>
+
+	<div id = "credits">
+	J. Lok, [M] [yyyy].
+	</div>
+
+</div>
+
+
+</body>
+
+</html>
