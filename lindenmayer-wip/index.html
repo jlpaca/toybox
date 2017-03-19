@@ -108,87 +108,86 @@ function mat4fromZYZ(e, r){
 		[             0,               0,     0,   1]];
 }
 
+function ZYZ(a, b, g){ return {alf: a, bet: b, gam: g};}
+function ZYZclone(e){ return {alf: e.alf, bet: e.bet, gam: e.gam};}
 
 </script>
 <script>
 // Lindenmayer
-var L = [];
-function node(ch, params) {
-	this.ch = ch; this.params = params;
+function node(c, a, b, g, l){
+	this.ch = c;
+	this.alf = a;
+	this.bet = b;
+	this.gam = g;
+	this.len = l;
 }
 
-
+var lindenmayer = [];
 function init(){
-	
-	L[0] = new node('L', {alf:0, bet:0, gam: 0, len: 10});
 
-	for (var i = 0; i < 3; ++i) {
-		L = recurse(L);
-	}
+	lindenmayer[0] = new node('F', 0, 0, 0, 4);
 
 	initcanvas();
 	timestep();
 }
 
-function axiom(n){
-	if (n.ch == 'L') {
-		return [
-			new node('L', {
-			alf:0, bet:0, gam: n.params.gam,
-			len:n.params.len*0.5}),
-
-			new node('[', null),
-
-			new node('L', {
-			alf:0, bet:0, gam: -Math.PI/6,
-			len:n.params.len*0.5}),
-
-			new node('L', {
-			alf:0, bet:0, gam: 0,
-			len:n.params.len*0.5}),
-
-			new node('L', {
-			alf:0, bet:0, gam: Math.PI/6,
-			len:n.params.len*0.5}),
-
-			new node(']', null),
-		];
-	} else {
-		return [n];
-	}
-}
-
 function recurse(t){
 	var newt = [];
 	for (var i = 0; i < t.length; ++i) {
-		newt = newt.concat(axiom(t[i]));
+		if (t[i].ch == 'F') {
+			newt.push(new node('F',
+			t[i].alf, t[i].bet, t[i].gam,
+			t[i].len*0.8));
+
+			newt.push(new node('['));
+
+			newt.push(new node(
+			'F', 0, 0, t[i].gam-Math.PI/4, t[i].len*0.8));
+
+			newt.push(new node(']'));
+
+			newt.push(new node(
+			'F', 0, 0, t[i].gam+Math.PI/4, t[i].len*0.8));
+
+		} else {
+			newt.push(new node(t[i].ch,
+			t[i].alf, t[i].bet, t[i].gam,
+			t[i].len));
+		}
 	}
 	return newt;
 }
+
 function render(t){
 	line([0, 0, 0, 1], [1, 0, 0, 1]);
 	line([0, 0, 0, 1], [0, 1, 0, 1]);
 	line([0, 0, 0, 1], [0, 0, 1, 1]);
 
-	var stack = [mat4id()];
-	var T = mat4id();
+	var turtle = {
+		q: [0, 0, 0, 1],
+		M: mat4id()};
+	var Sq = [];
+	var SM = [];
 	for (var i = 0; i < t.length; ++i) {
-		if (t[i].ch == 'L') {
-			var translate = mat4id(); translate[1][3] = L[i].params.len;
-			T = mat4mul(stack[stack.length-1],
-			mat4mul(mat4fromZYZ(L[i].params), translate));
+		if (t[i].ch == 'F') {
+			var T = mat4fromZYZ(t[i]);
+			var dq = mat4apply(T, [0, t[i].len, 0, 1]);
 
-			line(
-				mat4apply(stack[stack.length-1], [0, 0, 0, 1]),
-				mat4apply(T, [0, 0, 0, 1])
-			);
+			line(turtle.q, v4add(turtle.q, dq));
+			turtle.q = v4add(turtle.q, dq);
+			turtle.M = T;
 
-		} else if (t[i].ch = '[') {
-			stack.push(T);
-		} else if (t[i].ch = ']') {
-			stack.pop(T);
+		} else if (t[i].ch == '[') {
+			Sq.push([turtle.q[0], turtle.q[1], turtle.q[2], 1]);
+			SM.push(mat4mul(mat4id(), turtle.M));
+
+		} else if (t[i].ch == ']') {
+			turtle.q = Sq.pop();
+			turtle.M = SM.pop();
+
 		}
 	}
+
 }
 
 
@@ -246,7 +245,7 @@ function timestep(){
 	// clear canvas & render new tree
 	context.clearRect(0, 0, canvas.width, canvas.height);
 
-	render(L);
+	render(lindenmayer);
 
 	window.requestAnimationFrame(timestep);
 }
