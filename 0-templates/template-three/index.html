@@ -1,0 +1,124 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+
+<script src = "../shared/three.min.js"></script>
+<script>
+
+var renderer, camera, scene;
+var origin = new THREE.Vector3(0, 0, 0);
+
+function init(){
+	// set up renderer, camera, and scene
+	renderer = new THREE.WebGLRenderer({
+		canvas: document.getElementById("world")});
+	renderer.setClearColor(0xcccccc);
+
+	camera = new THREE.PerspectiveCamera(45,
+		renderer.domElement.clientHeight/
+		renderer.domElement.clientWidth,
+		1, 100);
+
+	camera.up.set(0, 0, 1);
+	scene = new THREE.Scene();
+
+	// origin cube, for reference.
+	var c = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), 
+		new THREE.MeshBasicMaterial({color: 0xffffff}));
+	scene.add(c);
+
+	// drawr some lines
+	lines([0, 0, 0], [1, 0, 0], 0xff0000);
+	lines([0, 0, 0], [0, 1, 0], 0x00ff00);
+	lines([0, 0, 0], [0, 0, 1], 0x0000ff);
+	timestep();
+}
+
+function lines(a, b, c){
+	
+	
+	var m = new THREE.LineBasicMaterial({color: c, linewidth: 2});
+	var g = new THREE.Geometry();
+	g.vertices.push(new THREE.Vector3(a[0], a[1], a[2]));
+	g.vertices.push(new THREE.Vector3(b[0], b[1], b[2]));
+
+	var l = new THREE.Line(g, m);
+	
+	scene.add(l);
+}
+
+var t = 0;
+function timestep(){
+	t = t + 0.01;
+
+	camera.position.set(10*Math.cos(t), 10*Math.sin(t), 0);
+	camera.lookAt(origin);
+
+	renderer.render(scene, camera);
+
+	window.requestAnimationFrame(timestep);
+}
+
+
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>TITLE</h2>
+
+	<canvas id = "world" width = "720" height = "720"></canvas>
+	<script> init(); </script>
+	
+	<div><p>description.</p></div>
+
+	<div id = "credits">
+	J. Lok, [M] [yyyy].
+	</div>
+
+</div>
+
+
+</body>
+
+</html>
