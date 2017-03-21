@@ -51,8 +51,20 @@ precision highp float;
 
 uniform sampler2D tex;
 
-float SQN = 64.0;
+float SQN = 128.;
 float TEXSIZE = 512.0;
+float DT = 0.002;
+
+vec4 Roessler(vec4 q) {
+	float A = 0.2, B = 0.2, C = 5.7;
+	return vec4(
+		-q.y-q.z,
+		q.x+A*q.y,
+		B+q.z*(q.x-C),
+		1
+	);
+}
+
 void main(){
 	
 	vec2 uv = gl_FragCoord.xy/TEXSIZE;
@@ -66,14 +78,18 @@ void main(){
 		q = texture2D(tex, uv-vec2(SQN/TEXSIZE, 0));
 		v = texture2D(tex, uv);
 
-		gl_FragColor = v;
+		//gl_FragColor = v+q;
+		
+		gl_FragColor = Roessler(q);
 
 	} else if (gl_FragCoord.x < SQN && gl_FragCoord.y <= SQN){
 		// location pixel
 		q = texture2D(tex, uv);
 		v = texture2D(tex, uv+vec2(SQN/TEXSIZE, 0));
 
-		gl_FragColor = q+v;
+		vec4 nv = Roessler(q);
+
+		gl_FragColor = q+nv*DT;
 
 	} else {
 		gl_FragColor = vec4(0, 0, 0, 1);
@@ -89,15 +105,15 @@ uniform sampler2D data;
 
 varying vec4 q;
 
-float TEXSIZE = 512.0;
+float TEXSIZE = 512.;
 void main(){
 
 	vec2 uv = (partq.xy+1.)/2./TEXSIZE;
 	
 	q = texture2D(data, uv);
 
-	gl_PointSize = 2.5;
-	gl_Position = vec4(q.xy, 0, 1);
+	gl_PointSize = 1.;
+	gl_Position = vec4(q.xy/120., 0, 1);
 }
 </script>
 <script id = "visfrag", type = "notjs">
@@ -107,7 +123,7 @@ varying vec4 q;
 
 void main(){
 	float z = (q.z+1.);
-	gl_FragColor = vec4(z, z, z, 1);
+	gl_FragColor = vec4(0, 0, 0, z);
 }
 </script>
 <script>
@@ -132,7 +148,7 @@ var texloc;
 var visprog;
 var dataloc;
 
-var sqN = 64;
+var sqN = 128;
 var L = 512;
 
 function initGL(){
@@ -282,18 +298,19 @@ function texgen(){
 	var t = [];
 	for (var i = 0; i < 4*L*L; ++i) { t[i] = 0; }
 
+	var range = 80;
 	
 	for(var i = 0; i < sqN; ++i){
 	for(var j = 0; j < sqN; ++j){
 		// locations
-		t[4*(j*L+i)  ] = Math.random()*2-1;
-		t[4*(j*L+i)+1] = Math.random()*2-1;
-		t[4*(j*L+i)+2] = Math.random()*2-1;
+		t[4*(j*L+i)  ] = range*(Math.random()*2-1);
+		t[4*(j*L+i)+1] = range*(Math.random()*2-1);
+		t[4*(j*L+i)+2] = range*(Math.random()*2-1);
 		t[4*(j*L+i)+3] = 1;
 		// velocities
-		t[4*(j*L+i+sqN)  ] = 0.005*(Math.random()*2-1);
-		t[4*(j*L+i+sqN)+1] = 0.005*(Math.random()*2-1);
-		t[4*(j*L+i+sqN)+2] = 0.005*(Math.random()*2-1);
+		t[4*(j*L+i+sqN)  ] = 0;//0.005*(Math.random()*2-1);
+		t[4*(j*L+i+sqN)+1] = 0;//0.005*(Math.random()*2-1);
+		t[4*(j*L+i+sqN)+2] = 0;//0.005*(Math.random()*2-1);
 		t[4*(j*L+i+sqN)+3] = 1;
 	}}
 	
