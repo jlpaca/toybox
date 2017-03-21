@@ -51,21 +51,33 @@ precision highp float;
 
 uniform sampler2D tex;
 
+float SQN = 64.0;
 float TEXSIZE = 512.0;
 void main(){
 	
 	vec2 uv = gl_FragCoord.xy/TEXSIZE;
 	float dx = 1.0/TEXSIZE;
+	vec4 q, v;
 
-	vec2 q = texture2D(tex, uv).rg;
-	vec2 v = texture2D(tex, uv).ba;
+	//gl_FragColor = vec4(q, 0, 1);
 
-	float a = -1.61, b = 1.8, c = -0.9, d = -0.4;
-	//gl_FragColor = vec4(q+v, v);
-	gl_FragColor = vec4(
-	sin(a*q.y)+c*cos(a*q.x),
-	sin(b*q.x)+d*cos(b*q.y),
-	0, 1);
+	if (gl_FragCoord.x > SQN && gl_FragCoord.x < 2.*SQN && gl_FragCoord.y <= SQN) {
+		// velocity pixel
+		q = texture2D(tex, uv-vec2(SQN/TEXSIZE, 0));
+		v = texture2D(tex, uv);
+
+		gl_FragColor = v;
+
+	} else if (gl_FragCoord.x < SQN && gl_FragCoord.y <= SQN){
+		// location pixel
+		q = texture2D(tex, uv);
+		v = texture2D(tex, uv+vec2(SQN/TEXSIZE, 0));
+
+		gl_FragColor = q+v;
+
+	} else {
+		gl_FragColor = vec4(0, 0, 0, 1);
+	}
 }
 </script>
 
@@ -75,19 +87,27 @@ void main(){
 attribute vec4 partq;
 uniform sampler2D data;
 
+varying vec4 q;
+
 float TEXSIZE = 512.0;
 void main(){
-	gl_PointSize = 2.;
 
 	vec2 uv = (partq.xy+1.)/2./TEXSIZE;
+	
+	q = texture2D(data, uv);
 
-	gl_Position = vec4(texture2D(data, uv).xy, 0, 1);
+	gl_PointSize = 2.5;
+	gl_Position = vec4(q.xy, 0, 1);
 }
 </script>
 <script id = "visfrag", type = "notjs">
 precision highp float;
+
+varying vec4 q;
+
 void main(){
-	gl_FragColor = vec4(0, 0, 0, 1);
+	float z = (q.z+1.);
+	gl_FragColor = vec4(z, z, z, 1);
 }
 </script>
 <script>
@@ -112,7 +132,7 @@ var texloc;
 var visprog;
 var dataloc;
 
-var sqN = 256;
+var sqN = 64;
 var L = 512;
 
 function initGL(){
@@ -236,12 +256,10 @@ function swapBuffers(){
 	renderA = !renderA;
 	if (renderA) { // read from B render to A
 		context.bindFramebuffer(context.FRAMEBUFFER, fbuffA);
-		context.activeTexture(context.TEXTURE1);
 		context.bindTexture(context.TEXTURE_2D, texB);
-		context.uniform1i(texloc, 1);
+		context.uniform1i(texloc, 0);
 	} else {
 		context.bindFramebuffer(context.FRAMEBUFFER, fbuffB);
-		context.activeTexture(context.TEXTURE0);
 		context.bindTexture(context.TEXTURE_2D, texA);
 		context.uniform1i(texloc, 0);
 	}
@@ -263,13 +281,20 @@ function setupfBuffer(tex){
 function texgen(){
 	var t = [];
 	for (var i = 0; i < 4*L*L; ++i) { t[i] = 0; }
+
 	
-	for(var i = 0; i < L; ++i){
-	for(var j = 0; j < L; ++j){
+	for(var i = 0; i < sqN; ++i){
+	for(var j = 0; j < sqN; ++j){
+		// locations
 		t[4*(j*L+i)  ] = Math.random()*2-1;
 		t[4*(j*L+i)+1] = Math.random()*2-1;
-		t[4*(j*L+i)+2] = 0.01*(Math.random()*2-1);
-		t[4*(j*L+i)+3] = 0.01*(Math.random()*2-1);
+		t[4*(j*L+i)+2] = Math.random()*2-1;
+		t[4*(j*L+i)+3] = 1;
+		// velocities
+		t[4*(j*L+i+sqN)  ] = 0.005*(Math.random()*2-1);
+		t[4*(j*L+i+sqN)+1] = 0.005*(Math.random()*2-1);
+		t[4*(j*L+i+sqN)+2] = 0.005*(Math.random()*2-1);
+		t[4*(j*L+i+sqN)+3] = 1;
 	}}
 	
 	
@@ -292,7 +317,6 @@ function initParticles(){
 		partq[2*(j*sqN+i)+1] = j;
 	}}
 	
-	//var partq = [0, 0, 1, 0, 0, 1, 1, 1];
 	context.bufferData(context.ARRAY_BUFFER,
 		new Float32Array(partq),
 		context.STATIC_DRAW);
