@@ -54,9 +54,9 @@ function integrate(q, v){
 
 // LORENZ ATTRACTOR
 function v_lorenz(q, v, p){
-	v[0] = p[0]*(q[1]-q[0]);
-	v[1] = q[0]*(p[2]-q[2])-q[1];
-	v[2] = q[0]*q[1]-p[1]*q[2];
+	v[0] = 0.6*(p[0]*(q[1]-q[0]));
+	v[1] = 0.6*(q[0]*(p[2]-q[2])-q[1]);
+	v[2] = 0.6*(q[0]*q[1]-p[1]*q[2]);
 }
 function lorenz(S){
 	S.reset(); S.f = v_lorenz;
@@ -69,7 +69,7 @@ function lorenz(S){
 	S.v = [0, 0, 0];
 	
 	S.steps_per_seg = 4;
-	S.segs_per_update = 12;
+	S.segs_per_update = 16;
 
 	// default viewing angle for maximum prettiness
 	orbitcontrols.camera_fromqspherical({
@@ -78,9 +78,9 @@ function lorenz(S){
 
 // ROESSLER ATTRACTOR
 function v_roessler(q, v, p){
-	v[0] = -q[1]-q[2];
-	v[1] = q[0]+p[0]*q[1];
-	v[2] = p[1]+q[2]*(q[0]-p[2]);
+	v[0] = 2*(-q[1]-q[2]);
+	v[1] = 2*(q[0]+p[0]*q[1]);
+	v[2] = 2*(p[1]+q[2]*(q[0]-p[2]));
 }
 function roessler(S){
 	S.reset(); S.f = v_roessler;
@@ -91,13 +91,61 @@ function roessler(S){
 	S.v = [0, 0, 0];
 
 	S.steps_per_seg = 4;
-	S.segs_per_update = 36;
+	S.segs_per_update = 16;
 
 	orbitcontrols.camera_fromqspherical({
 	o: [2.1, 1.2, 9, 1], r: 42, t: 4.2, f: -0.15});
 }
 
-var roster = [lorenz, roessler];
+// THOMAS
+function v_thomas(q, v, p){
+
+	v[0] = 60*(Math.sin(q[1]/6)-p[0]*q[0]/6);
+	v[1] = 60*(Math.sin(q[2]/6)-p[0]*q[1]/6);
+	v[2] = 60*(Math.sin(q[0]/6)-p[0]*q[2]/6);
+}
+function thomas(S){
+	S.reset(); S.f = v_thomas;
+
+	S.parameters = [0.2];
+
+	S.q = [0.1, 0, 0];
+	S.v = [0, 0, 0];
+
+	S.steps_per_seg = 4;
+	S.segs_per_update = 16;
+
+	orbitcontrols.camera_fromqspherical({
+	o: [16, 3, 8, 1], r: 60, t: 0.1, f: 0.3});
+}
+
+// CHUA CIRCUIT
+function v_chua(q, v, p){
+	var x = q[0]/10, y = q[1]/10, z = q[2]/10;
+	var m0 = -1.143, m1 = -0.714;
+
+	var f = m1*x+(m0-m1)/2*(Math.abs(x+1)-Math.abs(x-1));
+	v[0] = 20*p[0]*(y-x-f);
+	v[1] = 20*p[1]*(x-y+z);
+	v[2] = -20*p[2]*y;
+}
+function chua(S){
+	S.reset(); S.f = v_chua;
+
+	S.parameters = [15.6, 1, 28];
+
+	S.q = [0.7, 0, 0];
+	S.v = [0, 0, 0];
+
+	S.steps_per_seg = 4;
+	S.segs_per_update = 16;
+
+	orbitcontrols.camera_fromqspherical({
+	o: [0, -0, 0, 1], r: 70, t: 0.89, f: -0.34 });
+}
+
+
+var roster = [chua, thomas, lorenz, roessler];
 var currnt = 0;
 
 var max_segs_per_update = 72;
@@ -205,11 +253,22 @@ function init(){
 
 	// system
 	D = new Dynsys();
-	lorenz(D);
+	roster[0](D);
+
+	// handlers
+	window.addEventListener("keydown", keydownHandler);
 
 	// start timestepping
 	timestep();
 
+}
+function keydownHandler(e){
+	console.log(e.which);
+	if (e.which == 32 || e.which == 39) {
+		next();
+	} else if (e.which == 37) {
+		prev();
+	}
 }
 
 var t = 0;
@@ -230,6 +289,10 @@ function timestep(){
 }
 function next(){
 	currnt = (currnt+1)%roster.length;
+	roster[currnt](D);
+}
+function prev(){
+	currnt = (currnt+roster.length-1)%roster.length;
 	roster[currnt](D);
 }
 
