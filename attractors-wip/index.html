@@ -5,8 +5,8 @@
 <style>
 html, body {
 	margin: 0; padding: 0;
-	background-color: #fff;
-	color: #999;
+	background-color: #343434;
+	color: #666;
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
@@ -62,7 +62,7 @@ function lorenz(S){
 	S.reset(); S.f = v_lorenz;
 
 	// parameters
-	S.parameters = [10, 8/3, 28];
+	S.parameters = [12, 8/3, 28];
 
 	// initial conditions
 	S.q = [0.001, 0, 0];
@@ -181,7 +181,7 @@ Dynsys.prototype.visual_init = function() {
 
 
 	var m = new THREE.LineBasicMaterial({
-		color: 0x000000, linewidth: 1});
+		color: 0xffffff, linewidth: 1});
 
 	this.mesh = new THREE.Line(g, m);
 	scene.add(this.mesh);
@@ -235,7 +235,7 @@ function init(){
 		canvas: document.getElementById("world"),
 		antialias: true
 	});
-	renderer.setClearColor(0xcccccc);
+	renderer.setClearColor(0x363636);
 
 	camera = new THREE.PerspectiveCamera(30,
 		renderer.domElement.clientHeight/
@@ -263,11 +263,31 @@ function init(){
 
 }
 function keydownHandler(e){
-	console.log(e.which);
+	var pupd = false;
 	if (e.which == 32 || e.which == 39) {
+		// right arrow/space - next system
 		next();
 	} else if (e.which == 37) {
+		// left arrow - last system
 		prev();
+	} else if (48 < e.which && e.which < 52) {
+		D.parameters[e.which-49]*= 1.05;
+		pupd = true;
+	} else if (e.which == 81) {
+		D.parameters[0]*= 0.95;
+		pupd = true;
+	} else if (e.which == 87) {
+		D.parameters[1]*= 0.95;
+		pupd = true;
+	} else if (e.which == 69) {
+		D.parameters[2]*= 0.95;
+		pupd = true;
+	}
+
+	if (pupd) {
+		console.log(D.parameters);
+		D.reset();
+		pupd = false;
 	}
 }
 
@@ -303,7 +323,7 @@ function prev(){
 <body>
 
 <div id = "container">
-	<h2>TITLE</h2>
+	<h2>ATTRACTORS</h2>
 
 	<canvas id = "world" width = "720" height = "720"></canvas>
 	<script> init(); </script>
