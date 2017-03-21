@@ -42,6 +42,8 @@ h2 { font-size: 18px; }
 </style>
 
 <script src = "../shared/three.min.js"></script>
+<script src = "../shared/orbitcontrols.js"></script>
+<script src = "../shared/v4.js"></script>
 <script>
 
 function integrate(q, v){
@@ -50,42 +52,99 @@ function integrate(q, v){
 	q[2] = q[2]+v[2]*dt;
 }
 
-var max_time = 1048576;
-var dt = 0.002;
-function Lorenz(){
+// LORENZ ATTRACTOR
+function v_lorenz(q, v, p){
+	v[0] = p[0]*(q[1]-q[0]);
+	v[1] = q[0]*(p[2]-q[2])-q[1];
+	v[2] = q[0]*q[1]-p[1]*q[2];
+}
+function lorenz(S){
+	S.reset(); S.f = v_lorenz;
 
 	// parameters
-	this.sig = 10;
-	this.bet = 8/3;
-	this.rho = 28;
+	S.parameters = [10, 8/3, 28];
+
+	// initial conditions
+	S.q = [0.001, 0, 0];
+	S.v = [0, 0, 0];
+	
+	S.steps_per_seg = 4;
+	S.segs_per_update = 12;
+
+	// default viewing angle for maximum prettiness
+	orbitcontrols.camera_fromqspherical({
+	o: [10, 2.9, 14, 1], r: 88, t: 3.8, f: 0.9});
+}
+
+// ROESSLER ATTRACTOR
+function v_roessler(q, v, p){
+	v[0] = -q[1]-q[2];
+	v[1] = q[0]+p[0]*q[1];
+	v[2] = p[1]+q[2]*(q[0]-p[2]);
+}
+function roessler(S){
+	S.reset(); S.f = v_roessler;
+
+	S.parameters = [0.2, 0.2, 5.7];
+
+	S.q = [-0.1, 0.5, -0.6];
+	S.v = [0, 0, 0];
+
+	S.steps_per_seg = 4;
+	S.segs_per_update = 36;
+
+	orbitcontrols.camera_fromqspherical({
+	o: [2.1, 1.2, 9, 1], r: 42, t: 4.2, f: -0.15});
+}
+
+var roster = [lorenz, roessler];
+var currnt = 0;
+
+var max_segs_per_update = 72;
+var max_time = 4096;
+var dt = 0.002;
+function Dynsys(){
+
+	// parameters
+	this.parameters = null;
 
 	// system state
-	this.q = [1, 0, 0];
-	this.v = [-10, 0, 0];
+	this.q = [0, 0, 0];
+	this.v = [0, 0, 0];
+
+	this.f = null;
 
 	this.age = 0;
-
-
+	
+	this.steps_per_seg = 8;
+	this.segs_per_update = 12;
+	this.visual_init();
+	
+	return this;
+}
+Dynsys.prototype.visual_init = function() {
 	// THREE.js thingies
 	var g = new THREE.BufferGeometry();
 	g.addAttribute('position',
 	new THREE.BufferAttribute(
-		new Float32Array(max_time*3),
+		new Float32Array(max_time*max_segs_per_update*3),
 		3));
 	g.getAttribute('position').dynamic = true;
 
-	this.steps_per_seg = 4;
-	this.segs_per_update = 12;
 
 	var m = new THREE.LineBasicMaterial({
 		color: 0x000000, linewidth: 1});
 
 	this.mesh = new THREE.Line(g, m);
+	scene.add(this.mesh);
 
-	
-	return this;
+	// default viewing angle for maximum prettiness
+	this.defaultview = {
+		o: [0, 0, 0, 1],
+		r: 100, t: 0, f: 0};
+
 }
-Lorenz.prototype.update = function(){
+Dynsys.prototype.update = function(){
 	for (var j = 0; j < this.segs_per_update; ++j) {
 
 	var qpattr = this.mesh.geometry.getAttribute('position');
@@ -93,11 +152,7 @@ Lorenz.prototype.update = function(){
 
 	// update location of traced particle
 	for (var i = 0; i < this.steps_per_seg; ++i) {
-		this.v = [
-			this.sig*(this.q[1]-this.q[0]),
-			this.q[0]*(this.rho-this.q[2])-this.q[1],
-			this.q[0]*this.q[1]-this.bet*this.q[2]
-		];
+		this.f(this.q, this.v, this.parameters);
 		integrate(this.q, this.v);
 	}
 
@@ -113,11 +168,18 @@ Lorenz.prototype.update = function(){
 
 	}
 }
+Dynsys.prototype.reset = function() {
+	this.age = 0;
+	this.q = [0.001, 0, 0];
+	this.v = [0, 0, 0];
+}
 
 var renderer, camera, scene;
 var origin = new THREE.Vector3(0, 0, 0);
 
-var lorenz;
+var orbitcontrols;
+
+var D;
 
 function init(){
 	// set up renderer, camera, and scene
@@ -127,59 +189,48 @@ function init(){
 	});
 	renderer.setClearColor(0xcccccc);
 
-	camera = new THREE.PerspectiveCamera(45,
+	camera = new THREE.PerspectiveCamera(30,
 		renderer.domElement.clientHeight/
 		renderer.domElement.clientWidth,
-		10, 1000);
+		1, 1000);
 
 	camera.up.set(0, 0, 1);
+	camera.position.set(100, 100, 120);
+	camera.lookAt(origin);
+
 	scene = new THREE.Scene();
 
-	// origin cube, for reference.
-	var c = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), 
-		new THREE.MeshBasicMaterial({color: 0xffffff}));
-	scene.add(c);
+	// camera controls
+	orbitcontrols = new Orbitcontrols(camera, renderer, scene);
 
-	// drawr some lines
-	lines([0, 0, 0], [1, 0, 0], 0xff0000);
-	lines([0, 0, 0], [0, 1, 0], 0x00ff00);
-	lines([0, 0, 0], [0, 0, 1], 0x0000ff);
-
-	lorenz = new Lorenz();
-	scene.add(lorenz.mesh);
+	// system
+	D = new Dynsys();
+	lorenz(D);
 
 	// start timestepping
 	timestep();
 
 }
 
-function lines(a, b, c){
-	
-	
-	var m = new THREE.LineBasicMaterial({color: c, linewidth: 2});
-	var g = new THREE.Geometry();
-	g.vertices.push(new THREE.Vector3(a[0], a[1], a[2]));
-	g.vertices.push(new THREE.Vector3(b[0], b[1], b[2]));
-
-	var l = new THREE.Line(g, m);
-	
-	scene.add(l);
-}
-
 var t = 0;
 function timestep(){
 	t = t + dt;
+	window.requestAnimationFrame(timestep);
 
-	lorenz.update();
+	if (D.age >= max_time*D.segs_per_update) { next(); }
+	D.update();
 
+	orbitcontrols.update();
 
-	// update camera setup
-	camera.position.set(100*Math.cos(t), 100*Math.sin(t), 120);
-	camera.lookAt(origin);
 
 	renderer.render(scene, camera);
 
-	window.requestAnimationFrame(timestep);
+
+	
+}
+function next(){
+	currnt = (currnt+1)%roster.length;
+	roster[currnt](D);
 }
 
 
