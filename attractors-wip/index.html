@@ -1,6 +1,7 @@
 <!DOCTYPE HTML>
 <html>
 <head>
+<meta charset="UTF-8"/>
 <link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
 <style>
 html, body {
@@ -145,7 +146,7 @@ function chua(S){
 }
 
 
-var roster = [chua, thomas, lorenz, roessler];
+var roster = [lorenz, roessler, thomas, chua];
 var currnt = 0;
 
 var max_segs_per_update = 72;
@@ -328,7 +329,13 @@ function prev(){
 	<canvas id = "world" width = "720" height = "720"></canvas>
 	<script> init(); </script>
 	
-	<div><p>description.</p></div>
+	<div><p>
+		Phase space trajectories of several notable dynamical systems (Lorenz, Rössler, Thomas, and Chua, in order of presentation). Trajectories are integrated with a sympletic Euler scheme.	Written with javascript/WebGL.
+	<ul>
+		<li>LMB/WHEEL: move camera.</li>
+		<li>1/Q,2/W,3/E: adjust system parameters.</li>
+	</ul>
+	</p></div>
 
 	<div id = "credits">
 	J. Lok, [M] [yyyy].
