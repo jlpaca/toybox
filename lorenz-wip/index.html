@@ -27,365 +27,159 @@ h2 { font-size: 18px; }
 /* WORLD*/
 
 #world {
-	border: 1px #ccc dashed;
+	border: 1px #ccc none;/*dashed;*/
 
 	margin: 4px auto;
 
 	position: relative;
 
-	width: 512px;
-	height: 512px;
+	width: 720px;
+	height: 720px;
 
 	/*overflow: hidden;*/
 }
 
 </style>
 
-<!-- computation -->
-<script id = "texvert" type = "notjs">
-attribute vec4 vertq;
-void main() { gl_Position = vertq; }
-</script>
-<script id = "texfrag" type = "notjs">
-precision highp float;
-
-uniform sampler2D tex;
-
-float SQN = 128.;
-float TEXSIZE = 512.0;
-float DT = 0.002;
-
-vec4 Roessler(vec4 q) {
-	float A = 0.2, B = 0.2, C = 5.7;
-	return vec4(
-		-q.y-q.z,
-		q.x+A*q.y,
-		B+q.z*(q.x-C),
-		1
-	);
-}
-
-void main(){
-	
-	vec2 uv = gl_FragCoord.xy/TEXSIZE;
-	float dx = 1.0/TEXSIZE;
-	vec4 q, v;
-
-	//gl_FragColor = vec4(q, 0, 1);
-
-	if (gl_FragCoord.x > SQN && gl_FragCoord.x < 2.*SQN && gl_FragCoord.y <= SQN) {
-		// velocity pixel
-		q = texture2D(tex, uv-vec2(SQN/TEXSIZE, 0));
-		v = texture2D(tex, uv);
-
-		//gl_FragColor = v+q;
-		
-		gl_FragColor = Roessler(q);
-
-	} else if (gl_FragCoord.x < SQN && gl_FragCoord.y <= SQN){
-		// location pixel
-		q = texture2D(tex, uv);
-		v = texture2D(tex, uv+vec2(SQN/TEXSIZE, 0));
-
-		vec4 nv = Roessler(q);
-
-		gl_FragColor = q+nv*DT;
-
-	} else {
-		gl_FragColor = vec4(0, 0, 0, 1);
-	}
-}
-</script>
-
-
-<!-- visualisation -->
-<script id = "visvert" type = "notjs">
-attribute vec4 partq;
-uniform sampler2D data;
-
-varying vec4 q;
-
-float TEXSIZE = 512.;
-void main(){
-
-	vec2 uv = (partq.xy+1.)/2./TEXSIZE;
-	
-	q = texture2D(data, uv);
-
-	gl_PointSize = 1.;
-	gl_Position = vec4(q.xy/120., 0, 1);
-}
-</script>
-<script id = "visfrag", type = "notjs">
-precision highp float;
-
-varying vec4 q;
-
-void main(){
-	float z = (q.z+1.);
-	gl_FragColor = vec4(0, 0, 0, z);
-}
-</script>
+<script src = "../shared/three.min.js"></script>
 <script>
 
-var canvas;
-var context;
+function integrate(q, v){
+	q[0] = q[0]+v[0]*dt;
+	q[1] = q[1]+v[1]*dt;
+	q[2] = q[2]+v[2]*dt;
+}
 
-var texprog;
+var max_time = 1048576;
+var dt = 0.002;
+function Lorenz(){
 
-var texA;
-var fbuffA;
-var texB;
-var fbuffB;
+	// parameters
+	this.sig = 10;
+	this.bet = 8/3;
+	this.rho = 28;
 
-var vertqbuff;
-var vertqloc;
-var partqbuff;
-var partqloc;
+	// system state
+	this.q = [1, 0, 0];
+	this.v = [-10, 0, 0];
 
-var texloc;
-
-var visprog;
-var dataloc;
-
-var sqN = 128;
-var L = 512;
-
-function initGL(){
-	canvas = document.getElementById("world");
-	context = canvas.getContext("webgl");
-	context.getExtension('OES_texture_float');
-
-	var texvert = createShader(context.VERTEX_SHADER,
-		document.getElementById("texvert").text);
-	var texfrag = createShader(context.FRAGMENT_SHADER,
-		document.getElementById("texfrag").text);
-
-	texprog = createProgram(texvert, texfrag);
+	this.age = 0;
 
 
-	var visvert = createShader(context.VERTEX_SHADER,
-		document.getElementById("visvert").text);
-	var visfrag = createShader(context.FRAGMENT_SHADER,
-		document.getElementById("visfrag").text);
+	// THREE.js thingies
+	var g = new THREE.BufferGeometry();
+	g.addAttribute('position',
+	new THREE.BufferAttribute(
+		new Float32Array(max_time*3),
+		3));
+	g.getAttribute('position').dynamic = true;
 
-	visprog = createProgram(visvert, visfrag);
+	this.steps_per_seg = 4;
+	this.segs_per_update = 12;
 
+	var m = new THREE.LineBasicMaterial({
+		color: 0x000000, linewidth: 1});
 
-	// setup textures and framebuffers for tex
-	initSquare();
+	this.mesh = new THREE.Line(g, m);
 
-	texA = setupTexture(null);
-	fbuffA = setupfBuffer(texA);
+	
+	return this;
+}
+Lorenz.prototype.update = function(){
+	for (var j = 0; j < this.segs_per_update; ++j) {
 
-	texB = setupTexture(texgen());
-	fbuffB = setupfBuffer(texB);
+	var qpattr = this.mesh.geometry.getAttribute('position');
+	var qarray = qpattr.array;
 
-	texloc = context.getUniformLocation(texprog, "tex");
+	// update location of traced particle
+	for (var i = 0; i < this.steps_per_seg; ++i) {
+		this.v = [
+			this.sig*(this.q[1]-this.q[0]),
+			this.q[0]*(this.rho-this.q[2])-this.q[1],
+			this.q[0]*this.q[1]-this.bet*this.q[2]
+		];
+		integrate(this.q, this.v);
+	}
 
-	// setup texture for vis
-	initParticles();	
+	// push a new vertice
+	qarray[this.age*3  ] = this.q[0];
+	qarray[this.age*3+1] = this.q[1];
+	qarray[this.age*3+2] = this.q[2];
+	
+	qpattr.needsUpdate = true;
+	this.mesh.geometry.setDrawRange(0, this.age);
 
-	dataloc = context.getUniformLocation(visprog, "data");
+	++this.age;
 
-	//context.useProgram(null);
+	}
+}
 
+var renderer, camera, scene;
+var origin = new THREE.Vector3(0, 0, 0);
+
+var lorenz;
+
+function init(){
+	// set up renderer, camera, and scene
+	renderer = new THREE.WebGLRenderer({
+		canvas: document.getElementById("world"),
+		antialias: true
+	});
+	renderer.setClearColor(0xcccccc);
+
+	camera = new THREE.PerspectiveCamera(45,
+		renderer.domElement.clientHeight/
+		renderer.domElement.clientWidth,
+		10, 1000);
+
+	camera.up.set(0, 0, 1);
+	scene = new THREE.Scene();
+
+	// origin cube, for reference.
+	var c = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), 
+		new THREE.MeshBasicMaterial({color: 0xffffff}));
+	scene.add(c);
+
+	// drawr some lines
+	lines([0, 0, 0], [1, 0, 0], 0xff0000);
+	lines([0, 0, 0], [0, 1, 0], 0x00ff00);
+	lines([0, 0, 0], [0, 0, 1], 0x0000ff);
+
+	lorenz = new Lorenz();
+	scene.add(lorenz.mesh);
+
+	// start timestepping
 	timestep();
 
-	
 }
 
-var iter = 1;
+function lines(a, b, c){
+	
+	
+	var m = new THREE.LineBasicMaterial({color: c, linewidth: 2});
+	var g = new THREE.Geometry();
+	g.vertices.push(new THREE.Vector3(a[0], a[1], a[2]));
+	g.vertices.push(new THREE.Vector3(b[0], b[1], b[2]));
+
+	var l = new THREE.Line(g, m);
+	
+	scene.add(l);
+}
+
+var t = 0;
 function timestep(){
+	t = t + dt;
 
-	context.bindBuffer(context.ARRAY_BUFFER, partqbuff);
-	for (var i = 0; i < iter; ++i) {
-		swapBuffers();
-		texdrawr();
-	}
+	lorenz.update();
 
-	context.bindFramebuffer(context.FRAMEBUFFER, null);
 
-	visdrawr();
+	// update camera setup
+	camera.position.set(100*Math.cos(t), 100*Math.sin(t), 120);
+	camera.lookAt(origin);
+
+	renderer.render(scene, camera);
 
 	window.requestAnimationFrame(timestep);
-
-}
-
-function texdrawr(){
-	context.useProgram(texprog);
-
-	context.bindBuffer(context.ARRAY_BUFFER, vertqbuff);
-	context.vertexAttribPointer(vertqloc, 2,
-			context.FLOAT, false, 0, 0);
-
-	context.clear(context.COLOR_BUFFER_BIT);
-	context.viewport(0, 0, L, L);
-	context.drawArrays(context.TRIANGLE_STRIP, 0, 4);
-
-	context.bindBuffer(context.ARRAY_BUFFER, null);
-	//context.useProgram(null);
-}
-function visdrawr(){
-	context.useProgram(visprog);
-
-	context.bindBuffer(context.ARRAY_BUFFER, partqbuff);
-	context.vertexAttribPointer(partqloc, 2,
-			context.FLOAT, false, 0, 0);
-	
-	context.activeTexture(context.TEXTURE0);
-	context.bindTexture(context.TEXTURE_2D, texA);
-	context.uniform1i(dataloc, 0);
-
-	context.clear(context.COLOR_BUFFER_BIT);
-	context.viewport(0, 0, L, L);
-	//context.drawArrays(context.TRIANGLE_STRIP, 0, sqN*sqN);
-	context.drawArrays(context.POINTS, 0, sqN*sqN);
-
-	context.bindBuffer(context.ARRAY_BUFFER, null);
-}
-
-function setupTexture(data){
-	context.useProgram(texprog);
-	context.activeTexture(context.TEXTURE0);
-
-	var tex = context.createTexture();
-	context.bindTexture(context.TEXTURE_2D, tex);
-	context.texImage2D(context.TEXTURE_2D, 0, context.RGBA,
-					 L, L, 0, context.RGBA,
-					 context.FLOAT, data);
-	context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S, context.REPEAT);
-	context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.REPEAT);
-	context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.NEAREST);
-	context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.NEAREST);
-
-	context.bindTexture(context.TEXTURE_2D, null);
-
-	context.useProgram(null);
-	return tex;
-}
-
-var renderA = false;
-function swapBuffers(){
-	context.useProgram(texprog);
-
-	renderA = !renderA;
-	if (renderA) { // read from B render to A
-		context.bindFramebuffer(context.FRAMEBUFFER, fbuffA);
-		context.bindTexture(context.TEXTURE_2D, texB);
-		context.uniform1i(texloc, 0);
-	} else {
-		context.bindFramebuffer(context.FRAMEBUFFER, fbuffB);
-		context.bindTexture(context.TEXTURE_2D, texA);
-		context.uniform1i(texloc, 0);
-	}
-	//context.useProgram(null);
-}
-
-function setupfBuffer(tex){
-		
-	var fbuff = context.createFramebuffer();
-	context.bindFramebuffer(context.FRAMEBUFFER, fbuff);
-	context.framebufferTexture2D(context.FRAMEBUFFER, context.COLOR_ATTACHMENT0,
-					context.TEXTURE_2D, tex, 0);
-	context.bindFramebuffer(context.FRAMEBUFFER, null);
-	return fbuff;
-}
-
-
-
-function texgen(){
-	var t = [];
-	for (var i = 0; i < 4*L*L; ++i) { t[i] = 0; }
-
-	var range = 80;
-	
-	for(var i = 0; i < sqN; ++i){
-	for(var j = 0; j < sqN; ++j){
-		// locations
-		t[4*(j*L+i)  ] = range*(Math.random()*2-1);
-		t[4*(j*L+i)+1] = range*(Math.random()*2-1);
-		t[4*(j*L+i)+2] = range*(Math.random()*2-1);
-		t[4*(j*L+i)+3] = 1;
-		// velocities
-		t[4*(j*L+i+sqN)  ] = 0;//0.005*(Math.random()*2-1);
-		t[4*(j*L+i+sqN)+1] = 0;//0.005*(Math.random()*2-1);
-		t[4*(j*L+i+sqN)+2] = 0;//0.005*(Math.random()*2-1);
-		t[4*(j*L+i+sqN)+3] = 1;
-	}}
-	
-	
-	return new Float32Array(t);
-
-}
-
-function initParticles(){
-	context.useProgram(visprog);
-	partqbuff = context.createBuffer();
-	partqloc = context.getAttribLocation(visprog, "partq");
-	
-	context.bindBuffer(context.ARRAY_BUFFER, partqbuff);
-
-		
-	var partq = [];
-	for (var i = 0; i < sqN; ++i) {
-	for (var j = 0; j < sqN; ++j) {
-		partq[2*(j*sqN+i)  ] = i;
-		partq[2*(j*sqN+i)+1] = j;
-	}}
-	
-	context.bufferData(context.ARRAY_BUFFER,
-		new Float32Array(partq),
-		context.STATIC_DRAW);
-	context.enableVertexAttribArray(partqloc);
-	context.vertexAttribPointer(partqloc, 2,
-		context.FLOAT, false, 0, 0);
-
-	/*
-	context.bindBuffer(context.ARRAY_BUFFER, null);
-	*/
-}
-
-function initSquare(){
-	context.useProgram(texprog);
-	vertqbuff = context.createBuffer();
-	vertqloc  = context.getAttribLocation(texprog, "vertq");
-	context.bindBuffer(context.ARRAY_BUFFER, vertqbuff);
-
-	var squareq = [
-		1, 1,
-		1, -1,
-		-1, 1,
-		-1, -1
-		];
-
-	context.bufferData(context.ARRAY_BUFFER,
-			new Float32Array(squareq),
-			context.STATIC_DRAW);
-
-	context.enableVertexAttribArray(vertqloc);
-	context.vertexAttribPointer(vertqloc, 2,
-			context.FLOAT, false, 0, 0);
-
-	context.bindBuffer(context.ARRAY_BUFFER, null);
-}
-
-function createShader(type, source){
-	var shader = context.createShader(type);
-	context.shaderSource(shader, source);
-	context.compileShader(shader);
-	console.log(context.getShaderInfoLog(shader));
-	return shader;
-}
-
-function createProgram(vertshader, fragshader){
-	var program = context.createProgram();
-	context.attachShader(program, vertshader);
-	context.attachShader(program, fragshader);
-	context.linkProgram(program);
-
-	console.log(context.getProgramInfoLog(program));
-	return program;
 }
 
 
@@ -397,8 +191,8 @@ function createProgram(vertshader, fragshader){
 <div id = "container">
 	<h2>TITLE</h2>
 
-	<canvas id = "world" width = "512" height = "512"></canvas>
-	<script> initGL(); </script>
+	<canvas id = "world" width = "720" height = "720"></canvas>
+	<script> init(); </script>
 	
 	<div><p>description.</p></div>
 
