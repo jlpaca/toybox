@@ -28,6 +28,7 @@ function Orbitcontrols(camera, renderer, scene){
 		t: -Math.PI/2,		// azimuth
 		f: Math.PI/2		// elevation
 	};
+	this.qspherical_limits = [0, Infinity];
 
 	// shortcuts for special views:
 	// { keycode: spherical coordinates }
@@ -158,7 +159,10 @@ Orbitcontrols.prototype.mouseuphandler = function(e){
 }
 
 Orbitcontrols.prototype.wheelhandler = function(e){
-	this.qspherical.r = Math.max(0, this.qspherical.r + e.deltaY*this.dollyrate);
+	this.qspherical.r = Math.min(Math.max(
+		this.qspherical_limits[0],
+		this.qspherical.r + e.deltaY*this.dollyrate),
+		this.qspherical_limits[1]);
 }
 
 Orbitcontrols.prototype.attachhandlers = function(camera, renderer, scene){

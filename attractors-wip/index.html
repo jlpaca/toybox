@@ -55,9 +55,9 @@ function integrate(q, v){
 
 // LORENZ ATTRACTOR
 function v_lorenz(q, v, p){
-	v[0] = 0.6*(p[0]*(q[1]-q[0]));
-	v[1] = 0.6*(q[0]*(p[2]-q[2])-q[1]);
-	v[2] = 0.6*(q[0]*q[1]-p[1]*q[2]);
+	v[0] = 0.4*(p[0]*(q[1]-q[0]));
+	v[1] = 0.4*(q[0]*(p[2]-q[2])-q[1]);
+	v[2] = 0.4*(q[0]*q[1]-p[1]*q[2]);
 }
 function lorenz(S){
 	S.reset(); S.f = v_lorenz;
@@ -126,9 +126,9 @@ function v_chua(q, v, p){
 	var m0 = -1.143, m1 = -0.714;
 
 	var f = m1*x+(m0-m1)/2*(Math.abs(x+1)-Math.abs(x-1));
-	v[0] = 20*p[0]*(y-x-f);
-	v[1] = 20*p[1]*(x-y+z);
-	v[2] = -20*p[2]*y;
+	v[0] = 8*p[0]*(y-x-f);
+	v[1] = 8*p[1]*(x-y+z);
+	v[2] = -8*p[2]*y;
 }
 function chua(S){
 	S.reset(); S.f = v_chua;
@@ -181,8 +181,16 @@ Dynsys.prototype.visual_init = function() {
 	g.getAttribute('position').dynamic = true;
 
 
+	g.addAttribute('color',
+	new THREE.BufferAttribute(
+		new Float32Array(max_time*max_segs_per_update*3),
+		3));
+
+
 	var m = new THREE.LineBasicMaterial({
-		color: 0xffffff, linewidth: 1});
+		color: 0xffffff, linewidth: 1,
+		vertexColors: THREE.VertexColors
+	});
 
 	this.mesh = new THREE.Line(g, m);
 	scene.add(this.mesh);
@@ -199,18 +207,30 @@ Dynsys.prototype.update = function(){
 	var qpattr = this.mesh.geometry.getAttribute('position');
 	var qarray = qpattr.array;
 
+	var cpattr = this.mesh.geometry.getAttribute('color');
+	var carray = cpattr.array;
+
 	// update location of traced particle
 	for (var i = 0; i < this.steps_per_seg; ++i) {
 		this.f(this.q, this.v, this.parameters);
 		integrate(this.q, this.v);
 	}
 
-	// push a new vertice
+	// push a new vertice, position and colour.
 	qarray[this.age*3  ] = this.q[0];
 	qarray[this.age*3+1] = this.q[1];
 	qarray[this.age*3+2] = this.q[2];
-	
+
+
+	var velo = Math.sqrt(this.v[0]*this.v[0]+
+		this.v[1]*this.v[1]+this.v[2]*this.v[2]);
+
+	carray[this.age*3  ] = 1-Math.min(0.6, velo/140);
+	carray[this.age*3+1] = 1-Math.min(0.6, velo/140);
+	carray[this.age*3+2] = 1-Math.min(0.6, velo/140);
+
 	qpattr.needsUpdate = true;
+	cpattr.needsUpdate = true;
 	this.mesh.geometry.setDrawRange(0, this.age);
 
 	++this.age;
@@ -237,11 +257,12 @@ function init(){
 		antialias: true
 	});
 	renderer.setClearColor(0x363636);
+	//renderer.context.disable(renderer.context.DEPTH_TEST);
 
 	camera = new THREE.PerspectiveCamera(30,
 		renderer.domElement.clientHeight/
 		renderer.domElement.clientWidth,
-		1, 1000);
+		1, 600);
 
 	camera.up.set(0, 0, 1);
 	camera.position.set(100, 100, 120);
