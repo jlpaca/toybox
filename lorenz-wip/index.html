@@ -27,7 +27,7 @@ h2 { font-size: 18px; }
 /* WORLD*/
 
 #world {
-	border: 1px #ccc none;/*dashed;*/
+	border: 1px #ccc dashed;
 
 	margin: 4px auto;
 
@@ -57,10 +57,15 @@ void main(){
 	vec2 uv = gl_FragCoord.xy/TEXSIZE;
 	float dx = 1.0/TEXSIZE;
 
-	vec2 x = texture2D(tex, uv).rg;
+	vec2 q = texture2D(tex, uv).rg;
 	vec2 v = texture2D(tex, uv).ba;
 
-	gl_FragColor = vec4(x+v, v);
+	float a = -1.61, b = 1.8, c = -0.9, d = -0.4;
+	//gl_FragColor = vec4(q+v, v);
+	gl_FragColor = vec4(
+	sin(a*q.y)+c*cos(a*q.x),
+	sin(b*q.x)+d*cos(b*q.y),
+	0, 1);
 }
 </script>
 
@@ -72,7 +77,7 @@ uniform sampler2D data;
 
 float TEXSIZE = 512.0;
 void main(){
-	gl_PointSize = 3.;
+	gl_PointSize = 2.;
 
 	vec2 uv = (partq.xy+1.)/2./TEXSIZE;
 
@@ -107,7 +112,7 @@ var texloc;
 var visprog;
 var dataloc;
 
-var sqN = 64;
+var sqN = 256;
 var L = 512;
 
 function initGL(){
@@ -257,13 +262,16 @@ function setupfBuffer(tex){
 
 function texgen(){
 	var t = [];
+	for (var i = 0; i < 4*L*L; ++i) { t[i] = 0; }
+	
 	for(var i = 0; i < L; ++i){
 	for(var j = 0; j < L; ++j){
 		t[4*(j*L+i)  ] = Math.random()*2-1;
 		t[4*(j*L+i)+1] = Math.random()*2-1;
-		t[4*(j*L+i)+2] = 0.01*(Math.random()-0.5);
-		t[4*(j*L+i)+3] = 0.01*(Math.random()-0.5);
+		t[4*(j*L+i)+2] = 0.01*(Math.random()*2-1);
+		t[4*(j*L+i)+3] = 0.01*(Math.random()*2-1);
 	}}
+	
 	
 	return new Float32Array(t);
 
