@@ -66,8 +66,7 @@ function lorenz(S){
 	S.parameters = [12, 8/3, 28];
 
 	// initial conditions
-	S.q = [0.001, 0, 0];
-	S.v = [0, 0, 0];
+	S.initq = [-20, 0, -12];
 	
 	S.steps_per_seg = 4;
 	S.segs_per_update = 16;
@@ -88,8 +87,7 @@ function roessler(S){
 
 	S.parameters = [0.2, 0.2, 5.7];
 
-	S.q = [-0.1, 0.5, -0.6];
-	S.v = [0, 0, 0];
+	S.initq = [-0.1, 0.5, -0.6];
 
 	S.steps_per_seg = 4;
 	S.segs_per_update = 16;
@@ -110,8 +108,7 @@ function thomas(S){
 
 	S.parameters = [0.2];
 
-	S.q = [0.1, 0, 0];
-	S.v = [0, 0, 0];
+	S.initq = [0.1, 0, 0];
 
 	S.steps_per_seg = 4;
 	S.segs_per_update = 16;
@@ -135,8 +132,7 @@ function chua(S){
 
 	S.parameters = [15.6, 1, 28];
 
-	S.q = [0.7, 0, 0];
-	S.v = [0, 0, 0];
+	S.initq = [0.7, 0, 0];
 
 	S.steps_per_seg = 4;
 	S.segs_per_update = 16;
@@ -145,8 +141,31 @@ function chua(S){
 	o: [0, -0, 0, 1], r: 70, t: 0.89, f: -0.34 });
 }
 
+// SPROTT-LINZ E
+function v_chen(q, v, p){
 
-var roster = [lorenz, roessler, thomas, chua];
+	v[0] = -p[0]*p[1]/(p[0]+p[1])*q[0]-q[1]*q[2]+p[2];
+	v[1] = p[0]*q[1]+q[0]*q[2];
+	v[2] = p[1]*q[2]+q[0]*q[1];
+}
+function chen(S){
+	S.reset(); S.f = v_chen;
+
+	S.parameters = [-8.52, -4,-0.1];
+
+	S.initq = [10, -20, -5];
+
+	S.steps_per_seg = 4;
+	S.segs_per_update = 16;
+
+	orbitcontrols.camera_fromqspherical({
+	o: [1.17, -4.41, -1.4, 1], r: 115, t: 0.36, f: -0.4 });
+	//orbitcontrols.camera_fromqspherical({
+	//o: [9, 2, 10, 1], r: 120, t: 5.2, f: -0.1 });
+}
+
+
+var roster = [lorenz, roessler, thomas, chua, chen];
 var currnt = 0;
 
 var max_segs_per_update = 72;
@@ -158,6 +177,7 @@ function Dynsys(){
 	this.parameters = null;
 
 	// system state
+	this.initq = [0, 0, 0];
 	this.q = [0, 0, 0];
 	this.v = [0, 0, 0];
 
@@ -239,7 +259,10 @@ Dynsys.prototype.update = function(){
 }
 Dynsys.prototype.reset = function() {
 	this.age = 0;
-	this.q = [0.001, 0, 0];
+	this.q = [
+		this.initq[0],
+		this.initq[1],
+		this.initq[2]];
 	this.v = [0, 0, 0];
 }
 
@@ -275,7 +298,7 @@ function init(){
 
 	// system
 	D = new Dynsys();
-	roster[0](D);
+	roster[0](D); D.reset();
 
 	// handlers
 	window.addEventListener("keydown", keydownHandler);
@@ -286,23 +309,24 @@ function init(){
 }
 function keydownHandler(e){
 	var pupd = false;
-	if (e.which == 32 || e.which == 39) {
-		// right arrow/space - next system
+	if (e.which == 32) {
+		D.reset();
+	} else if (e.which == 39) {
 		next();
 	} else if (e.which == 37) {
 		// left arrow - last system
 		prev();
 	} else if (48 < e.which && e.which < 52) {
-		D.parameters[e.which-49]*= 1.05;
+		D.parameters[e.which-49]*= 1.02;
 		pupd = true;
 	} else if (e.which == 81) {
-		D.parameters[0]*= 0.95;
+		D.parameters[0]*= 0.96;
 		pupd = true;
 	} else if (e.which == 87) {
-		D.parameters[1]*= 0.95;
+		D.parameters[1]*= 0.96;
 		pupd = true;
 	} else if (e.which == 69) {
-		D.parameters[2]*= 0.95;
+		D.parameters[2]*= 0.96;
 		pupd = true;
 	}
 
@@ -331,11 +355,11 @@ function timestep(){
 }
 function next(){
 	currnt = (currnt+1)%roster.length;
-	roster[currnt](D);
+	roster[currnt](D); D.reset();
 }
 function prev(){
 	currnt = (currnt+roster.length-1)%roster.length;
-	roster[currnt](D);
+	roster[currnt](D); D.reset();
 }
 
 
@@ -351,10 +375,10 @@ function prev(){
 	<script> init(); </script>
 	
 	<div><p>
-		Phase space trajectories of several notable dynamical systems (Lorenz, Rössler, Thomas, and Chua, in order of presentation). Trajectories are integrated with a sympletic Euler scheme.	Written with javascript/WebGL.
+		Phase space trajectories of several notable dynamical systems (Lorenz, Rössler, Thomas, Chua, and Lü-Chen, in order of presentation). Trajectories are integrated with a sympletic Euler scheme. Written with javascript/WebGL.
 	<ul>
 		<li>LMB/WHEEL: move camera.</li>
-		<li>LEFT/RIGHT/SPACE: go to previous/next system.</li>
+		<li>LEFT/RIGHT/SPACE: previous/next/reset system.</li>
 		<li>1/Q,2/W,3/E: adjust system parameters.</li>
 	</ul>
 	</p></div>
