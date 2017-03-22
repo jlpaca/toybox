@@ -141,12 +141,12 @@ function chua(S){
 	o: [0, -0, 0, 1], r: 70, t: 0.89, f: -0.34 });
 }
 
-// SPROTT-LINZ E
+// LU-CHEN
 function v_chen(q, v, p){
 
-	v[0] = -p[0]*p[1]/(p[0]+p[1])*q[0]-q[1]*q[2]+p[2];
-	v[1] = p[0]*q[1]+q[0]*q[2];
-	v[2] = p[1]*q[2]+q[0]*q[1];
+	v[0] = 0.5*(-p[0]*p[1]/(p[0]+p[1])*q[0]-q[1]*q[2]+p[2]);
+	v[1] = 0.5*(p[0]*q[1]+q[0]*q[2]);
+	v[2] = 0.5*(p[1]*q[2]+q[0]*q[1]);
 }
 function chen(S){
 	S.reset(); S.f = v_chen;
@@ -164,8 +164,30 @@ function chen(S){
 	//o: [9, 2, 10, 1], r: 120, t: 5.2, f: -0.1 });
 }
 
+// SPROTT-LINZ
+function v_sprott(q, v, p){
 
-var roster = [lorenz, roessler, thomas, chua, chen];
+	v[0] = 40*(q[1]/12);
+	v[1] = 40*(q[2]/12);
+	v[2] = 40*(-p[0]*q[2]/12-q[1]/12+Math.abs(q[0]/12)-1);
+}
+function sprott(S){
+	S.reset(); S.f = v_sprott;
+
+	S.parameters = [0.6];
+
+	S.initq = [0, 1, 0]
+
+	S.steps_per_seg = 4;
+	S.segs_per_update = 16;
+
+	orbitcontrols.camera_fromqspherical({
+	o: [1, 2, -1, 1], r: 66, t: 0.36, f: -0.4 });
+	//orbitcontrols.camera_fromqspherical({
+	//o: [9, 2, 10, 1], r: 120, t: 5.2, f: -0.1 });
+}
+
+var roster = [lorenz, roessler, thomas, chua, chen, sprott];
 var currnt = 0;
 
 var max_segs_per_update = 72;
@@ -375,7 +397,7 @@ function prev(){
 	<script> init(); </script>
 	
 	<div><p>
-		Phase space trajectories of several notable dynamical systems (Lorenz, Rössler, Thomas, Chua, and Lü-Chen, in order of presentation). Trajectories are integrated with a sympletic Euler scheme. Written with javascript/WebGL.
+		Phase space trajectories of several notable dynamical systems (Lorenz, Rössler, Thomas, Chua, Lü-Chen, and Sprott-Linz, in order of presentation). Trajectories are integrated with a sympletic Euler scheme. Written with javascript/WebGL.
 	<ul>
 		<li>LMB/WHEEL: move camera.</li>
 		<li>LEFT/RIGHT/SPACE: previous/next/reset system.</li>
