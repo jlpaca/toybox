@@ -160,8 +160,6 @@ function chen(S){
 
 	orbitcontrols.camera_fromqspherical({
 	o: [1.17, -4.41, -1.4, 1], r: 115, t: 0.36, f: -0.4 });
-	//orbitcontrols.camera_fromqspherical({
-	//o: [9, 2, 10, 1], r: 120, t: 5.2, f: -0.1 });
 }
 
 // SPROTT-LINZ
@@ -183,11 +181,31 @@ function sprott(S){
 
 	orbitcontrols.camera_fromqspherical({
 	o: [1, 2, -1, 1], r: 66, t: 0.36, f: -0.4 });
-	//orbitcontrols.camera_fromqspherical({
-	//o: [9, 2, 10, 1], r: 120, t: 5.2, f: -0.1 });
 }
 
-var roster = [lorenz, roessler, thomas, chua, chen, sprott];
+// RABINOVICH-FABRIKANT
+function v_rabinovich(q, v, p){
+	var x = q[0]/16, y = q[1]/16, z = q[2]/16;
+	v[0] = 80*(y*(z-1+x*x)+p[1]*x);
+	v[1] = 80*(x*(3*z+1-x*x)+p[1]*y);
+	v[2] = 80*(-2*z*(p[0]+x*y));
+}
+function rabinovich(S){
+	S.reset(); S.f = v_rabinovich;
+
+	S.parameters = [0.98, 0.1];
+
+	//S.initq = [1, 13, 11];
+	S.initq = [1, 13, 11];
+
+	S.steps_per_seg = 4;
+	S.segs_per_update = 16;
+
+	orbitcontrols.camera_fromqspherical({
+	o: [0.01, 4.34, 1.9, 1], r: 90, t: 2.6, f: 0.36 });
+}
+
+var roster = [lorenz, roessler, thomas, chua, chen, sprott, rabinovich];
 var currnt = 0;
 
 var max_segs_per_update = 72;
@@ -397,7 +415,7 @@ function prev(){
 	<script> init(); </script>
 	
 	<div><p>
-		Phase space trajectories of several notable dynamical systems (Lorenz, Rössler, Thomas, Chua, Lü-Chen, and Sprott-Linz, in order of presentation). Trajectories are integrated with a sympletic Euler scheme. Written with javascript/WebGL.
+		Phase space trajectories of several notable dynamical systems (Lorenz, Rössler, Thomas, Chua, Lü-Chen, Sprott-Linz, and Rabinovich-Fabrikant, in order of presentation). Trajectories are integrated with a sympletic Euler scheme. Written with javascript/WebGL.
 	<ul>
 		<li>LMB/WHEEL: move camera.</li>
 		<li>LEFT/RIGHT/SPACE: previous/next/reset system.</li>
