@@ -43,10 +43,7 @@ h2 { font-size: 18px; }
 var Vector2 = function(x, y){ this.x = x; this.y = y; }
 Vector2.prototype = {
 	x: 0, y: 0,
-	set: function(x, y) {
-		if (x.x !== undefined) { this.x = x.x, this.y = x.y; }
-		else { this.x = x, this.y = y; }
-	},
+	set: function(x, y) { this.x = x, this.y = y; },
 	add: function(v, w) {
 		if (v.x !== undefined) { this.x += v.x; this.y += v.y; }
 		else { this.x += v, this.y += w; }
@@ -60,10 +57,21 @@ Vector2.prototype = {
 	mul: function(a) { this.x *= a; this.y *= a; return this; },
 	div: function(a) { this.x /= a; this.y /= a; return this; },
 	mag: function() { return Math.sqrt(this.x*this.x+this.y*this.y); },
-	unit: function() { return this.div(this.mag()); },
-	clone: function() { return new Vector2(this.x, this.y); }
+	unit: function() {
+		return this.mag()<V2.epsilon?
+		this.set(0, 0):
+		this.div(this.mag());
+	},
+	clone: function() { return new Vector2(this.x, this.y); },
+
+	clip: function(m) {
+		if (this.mag() < m) { return this; }
+		return this.unit().mul(m);
+	}
 };
 var V2 = {
+	epsilon: 1e-10,
+
 	add: function(u, v) { return new Vector2(u.x+v.x, u.y+v.y); },
 	sub: function(u, v) { return new Vector2(u.x-v.x, u.y-v.y); },
 	mul: function(a, u) { return new Vector2(a*u.x, a*u.y); },
@@ -82,15 +90,24 @@ var Particle = function(x, y, m){
 }
 Particle.prototype = {
 
-	integrate: function(dt){
+	integrate: function(dt, damping){
+
 		var new_q = this.q.clone().mul(2).sub(this.prev_q).add(
 			V2.mul(this.m*dt*dt, this.f));
 		this.prev_q = this.q;
+
 		this.q = new_q;
+
+		this.q.sub(V2.sub(this.q, this.prev_q).mul(damping));
+		
+		this.q.add(0, 0.1);
+		this.prev_q.add(0, 0.1);
 
 		this.f.set(0, 0);
 	}
 };
+
+
 
 var Lipid = function(x, y, thet){
 	this.head = new Particle(x, y, 1);
@@ -100,13 +117,13 @@ var Lipid = function(x, y, thet){
 		1);
 }
 Lipid.prototype = {
-	l: 12,
+	l: 10,
 	r: 2.2,
 
-	integrate: function(dt){
+	integrate: function(dt, L, damping){
 		// move individual ends
-		this.head.integrate(dt);
-		this.tail.integrate(dt);
+		this.head.integrate(dt, damping);
+		this.tail.integrate(dt, damping);
 
 		// solve length constraint
 		
@@ -117,7 +134,7 @@ Lipid.prototype = {
 		
 		this.head.q.sub(V2.mul(p, d));
 		this.tail.q.add(V2.mul(p, d));
-		
+
 	},
 	draw: function(ctx){
 		ctx.beginPath();
@@ -134,11 +151,58 @@ Lipid.prototype = {
 };
 
 
-var Pool = function(L, dt){
+
+// a sigmoid function that takes goes from 0 to 1
+function sgm(x){ return 0.5+2*x/Math.sqrt(1+16*x*x); }
+
+function forcesgm(near, far, threshold, width, range){
+	// interpolates between near and far values, making
+	// jump at threshold with width being the distance
+	// from threshold required to nearly reach target value.
+	// beyond range, force is taken to be zero.
+	return function(r){
+		if (r > range) { return 0; }
+		return near+sgm((r-threshold)/width)*(far-near);
+	};
+}
+
+var force_repl = forcesgm(120, 0, 6, 3, 50); // incompressibility force
+var force_hhrepl = forcesgm(1, 0, 20, 10, 50);
+
+function force_hh(h1, h2){
+	var r = V2.sub(h2.q, h1.q);
+	var repl = force_repl(r.mag())+force_hhrepl(r.mag());
+	var attr = forcesgm(-5, 0, 20, 50, 100)(r.mag());
+
+	r.unit().mul(attr+repl);
+	h1.f.sub(r); h2.f.add(r);
+}
+function force_tt(t1, t2){
+	var r = V2.sub(t2.q, t1.q);
+	var repl = force_repl(r.mag());
+	var attr = forcesgm(-8, 0, 20, 50, 100)(r.mag());
+
+	r.unit().mul(repl);
+	t1.f.sub(r); t2.f.add(r);
+}
+function force_ht(h, t){
+	var r = V2.sub(t.q, h.q);
+	var repl = force_repl(r.mag());
+	var ht_repl = forcesgm(3, 0, 20, 50, 100)(r.mag());
+
+	r.unit().mul(repl+ht_repl);
+	h.f.sub(r); t.f.add(r);
+}
+
+
+
+var Pool = function(L, dt, damping){
 	this.lipids = [];
 
 	this.L = L;
 	this.dt = dt;
+
+	this.damping = damping;
 
 	this.canv = document.getElementById('pool');
 	this.canv.width = this.canv.height = this.L;
@@ -159,18 +223,34 @@ Pool.prototype = {
 	},
 	integrate: function(){
 		for (var i = 0; i < this.lipids.length; ++i) {
-			this.lipids[i].integrate(this.dt);
+			this.lipids[i].integrate(
+			this.dt, this.L, this.damping);
 		}
 	},
 	forces: function(){
+	
+		// brownian
+		var b_mag = 3;
 		for (var i = 0; i < this.lipids.length; ++i) {
 			this.lipids[i].head.f.set(
-				6*Math.random()-3,
-				6*Math.random()-3);
+				b_mag*2*Math.random()-b_mag,
+				b_mag*2*Math.random()-b_mag);
 			this.lipids[i].tail.f.set(
-				6*Math.random()-3,
-				6*Math.random()-3);
+				b_mag*2*Math.random()-b_mag,
+				b_mag*2*Math.random()-b_mag);
 		}
+
+		// crummy N^2 thingy. TODO: spatial hash maybe
+		for (var i = 0; i < this.lipids.length; ++i) {
+		for (var j = i+1; j < this.lipids.length; ++j) {
+			force_hh(this.lipids[i].head, this.lipids[j].head);
+			force_tt(this.lipids[i].tail, this.lipids[j].tail);
+
+			force_ht(this.lipids[i].head, this.lipids[j].tail);
+			force_ht(this.lipids[j].head, this.lipids[i].tail);
+		}}
+
+
 	},
 	render: function(){
 		this.ctx.clearRect(0, 0, this.canv.width, this.canv.height);
@@ -189,9 +269,14 @@ Pool.prototype = {
 	}
 }
 
-var pool = new Pool(720, 0.05);
-pool.addRandomLipids(10);
+var pool = new Pool(720, 0.05, 0.01);
+//pool.addRandomLipids(200);
 
+for (var i = 0; i < 10; ++i) {
+for (var j = 0; j < 10; ++j) {
+	pool.addLipid(20+i*50, 20+j*10, Math.PI);
+	pool.addLipid(32+i*50, 20+j*10, 0);
+}}
 pool.run();
 
 
