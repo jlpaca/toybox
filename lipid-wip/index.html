@@ -38,191 +38,164 @@ h2 { font-size: 18px; }
 	<h2>LIPID</h2>
 
 	<canvas id = "pool"></canvas>
-	<script src="../shared/v.js"></script>
 <script>
-function clip(x, a, b){
-	if (x < a) { return a; }
-	if (x > b) { return b; }
-	return x;
-}
-
-var Lipid = function(x, y, thet){
-	this.prev_hx = this.hx = x;
-	this.prev_hy = this.hy = y;
-
-	this.h = [x, y];
-	this.prev_x = [x, y];
-
-	this.prev_tx = this.tx = x+this.l*Math.cos(thet);
-	this.prev_ty = this.ty = y+this.l*Math.sin(thet);
-
-	this.prev_hx += Math.random()-0.5;
-	this.prev_hy += Math.random()-0.5;
-	this.prev_tx += Math.random()-0.5;
-	this.prev_ty += Math.random()-0.5;
-
-}
-
-// force curves.
-function sgm(x){ return 3*x/Math.sqrt(1+9*x*x); }
-function force_hh(r){
-	// sgm(x) approx 95% when x = 1.
-
-
-}
-function force_repulse(r){
-	r = clamp(r, 0.001, infinity)
-	return 1/r;
-}
-Lipid.prototype = {
-	hm: 1,		// head inv-mass
-	hx: 0, hy: 0,	// head location
-	prev_hx: 0,
-	prev_hy: 0,
-
-	tm: 1,		// tail inv-mass
-	tx: 0, ty: 0,	// tail location
-	prev_tx: 0,
-	prev_ty: 0,
-	l: 8,		// tail length
-	r: 2,		// ball radius
-	
-	fhx: 0, fhy: 0,	// accumulated forces
-	ftx: 0, fty: 0,	// on head and tail.
-
-	forces: function(lpd){
-		// add to self forces exerted
-		// by some other lipid particle
-
-		
+// SIMPLE 2-VECTOR LIBRARY
+var Vector2 = function(x, y){ this.x = x; this.y = y; }
+Vector2.prototype = {
+	x: 0, y: 0,
+	set: function(x, y) {
+		if (x.x !== undefined) { this.x = x.x, this.y = x.y; }
+		else { this.x = x, this.y = y; }
 	},
-
-	motion: function(L, dt){
-		// verlet integration
-
-		next_hx =
-		2*this.hx-this.prev_hx+dt*dt*this.fhx*this.hm;
-		next_hy =
-		2*this.hy-this.prev_hy+dt*dt*this.fhy*this.hm;
-
-
-		next_tx =
-		2*this.tx-this.prev_tx+dt*dt*this.ftx*this.tm;
-		next_ty =
-		2*this.ty-this.prev_ty+dt*dt*this.fty*this.tm;
-
-		// length constraint. This preserves momentum and stuff.
-		var dx = next_hx-next_tx; var dy = next_hy-next_ty;
-		var d = Math.sqrt(dx*dx+dy*dy);
-		dx /= d; dy /= d; var err = this.l - d;
-		
-		var ratio = 0.5;
-
-		next_hx += ratio*err*dx;
-		next_hy += ratio*err*dy;
-		next_tx -= ratio*err*dx;
-		next_ty -= ratio*err*dy;
-
-		// TODO: add damping.
-
-		// torus boundary
-		next_hx = clip(next_hx, 0, L);
-		next_hy = clip(next_hy, 0, L);
-		next_tx = clip(next_tx, 0, L);
-		next_ty = clip(next_ty, 0, L);
-
-		// update
-		this.prev_hx = this.hx; this.prev_hy = this.hy;
-		this.prev_tx = this.tx; this.prev_ty = this.ty;
-
-		this.hx = next_hx; this.hy = next_hy;
-		this.tx = next_tx; this.ty = next_ty;
-
-		this.fhx = this.fhy = 0;
-		this.ftx = this.fty = 0;
+	add: function(v, w) {
+		if (v.x !== undefined) { this.x += v.x; this.y += v.y; }
+		else { this.x += v, this.y += w; }
+		return this;
 	},
+	sub: function(v, w) {
+		if (v.x !== undefined) { this.x -= v.x; this.y -= v.y; }
+		else { this.x -= v, this.y -= w; }
+		return this;
+	},
+	mul: function(a) { this.x *= a; this.y *= a; return this; },
+	div: function(a) { this.x /= a; this.y /= a; return this; },
+	mag: function() { return Math.sqrt(this.x*this.x+this.y*this.y); },
+	unit: function() { return this.div(this.mag()); },
+	clone: function() { return new Vector2(this.x, this.y); }
+};
+var V2 = {
+	add: function(u, v) { return new Vector2(u.x+v.x, u.y+v.y); },
+	sub: function(u, v) { return new Vector2(u.x-v.x, u.y-v.y); },
+	mul: function(a, u) { return new Vector2(a*u.x, a*u.y); },
+	div: function(a, u) { return new Vector2(u.x/a, u.y/a); },
+	unit: function(u) { return u.clone().unit(); }
+};
+</script>
 
-	draw: function(ctx){
-		// draw head
-		ctx.beginPath();
-		ctx.arc(this.hx, this.hy, this.r, 0, 2*Math.PI);
-		ctx.fill();
+<script>
+var Particle = function(x, y, m){
+	this.m = 1;
+	this.q = new Vector2(x, y);
+	this.prev_q = new Vector2(x, y);
 
-		// draw stick
-		ctx.moveTo(this.hx, this.hy);
-		ctx.lineTo(this.tx, this.ty);
-		ctx.stroke();
-		
-		// beginPath() and stroke() might actually
-		// be more efficient here since things are
-		// small, performance tests pending.
+	this.f = new Vector2(0, 0);
+}
+Particle.prototype = {
+
+	integrate: function(dt){
+		var new_q = this.q.clone().mul(2).sub(this.prev_q).add(
+			V2.mul(this.m*dt*dt, this.f));
+		this.prev_q = this.q;
+		this.q = new_q;
+
+		this.f.set(0, 0);
 	}
 };
 
+var Lipid = function(x, y, thet){
+	this.head = new Particle(x, y, 1);
+	this.tail = new Particle(
+		this.head.q.x+this.l*Math.cos(thet),
+		this.head.q.y+this.l*Math.sin(thet),
+		1);
+}
+Lipid.prototype = {
+	l: 12,
+	r: 2.2,
+
+	integrate: function(dt){
+		// move individual ends
+		this.head.integrate(dt);
+		this.tail.integrate(dt);
+
+		// solve length constraint
+		
+		var d = V2.sub(this.head.q, this.tail.q);
+		var p = (d.mag()-this.l)/2;
+		d.unit();
+
+		
+		this.head.q.sub(V2.mul(p, d));
+		this.tail.q.add(V2.mul(p, d));
+		
+	},
+	draw: function(ctx){
+		ctx.beginPath();
+		ctx.arc(this.head.q.x, this.head.q.y,
+		this.r, 0, 2*Math.PI);
+		ctx.fill();
+
+		ctx.beginPath();
+		ctx.moveTo(this.head.q.x, this.head.q.y);
+		ctx.lineTo(this.tail.q.x, this.tail.q.y);
+		ctx.stroke();
+
+	}
+};
+
+
 var Pool = function(L, dt){
-	this.dt = dt;
+	this.lipids = [];
+
 	this.L = L;
+	this.dt = dt;
 
 	this.canv = document.getElementById('pool');
 	this.canv.width = this.canv.height = this.L;
-	this.ctx = this.canv.getContext("2d");
+	this.ctx = this.canv.getContext('2d');
 }
 Pool.prototype = {
-
-	lipids: [],
-
-	addLipid: function(x, y, theta){
-		this.lipids.push(new Lipid(x, y, theta));
+	addLipid: function(x, y, thet){
+		this.lipids.push(new Lipid(x, y, thet));
 	},
-	addRandomLipids: function(n){
+	addRandomLipids: function(n) {
 		for (var i = 0; i < n; ++i) {
 			this.addLipid(
 			Math.random()*this.L,
 			Math.random()*this.L,
-			Math.random()*Math.PI*2);
+			Math.random()*2*Math.PI
+			);
 		}
 	},
-
-	forces: function(){
-		// N^2 forces. do a spatial hash or something later.
+	integrate: function(){
 		for (var i = 0; i < this.lipids.length; ++i) {
-		for (var j = 0; j < this.lipids.length; ++j) {
-			this.lipids[i].forces(this.lipids[j]);
-		}}
+			this.lipids[i].integrate(this.dt);
+		}
 	},
-	motion: function(){
+	forces: function(){
 		for (var i = 0; i < this.lipids.length; ++i) {
-			this.lipids[i].motion(this.L, this.dt);
+			this.lipids[i].head.f.set(
+				6*Math.random()-3,
+				6*Math.random()-3);
+			this.lipids[i].tail.f.set(
+				6*Math.random()-3,
+				6*Math.random()-3);
 		}
 	},
 	render: function(){
-		this.ctx.clearRect(0, 0,
-		this.canv.width, this.canv.height);
-
+		this.ctx.clearRect(0, 0, this.canv.width, this.canv.height);
 		for (var i = 0; i < this.lipids.length; ++i) {
 			this.lipids[i].draw(this.ctx);
 		}
 	},
-
 	timestep: function(){
 		this.forces();
-		this.motion(this.L, this.dt);
-		this.render(this.ctx);
+		this.integrate();
+		this.render();
 	},
-
 	run: function(){
 		this.timestep();
 		window.requestAnimationFrame(this.run.bind(this));
 	}
-};
+}
 
-
-var pool = new Pool(720, 0.1);
-pool.addRandomLipids(100);
+var pool = new Pool(720, 0.05);
+pool.addRandomLipids(10);
 
 pool.run();
 
-	</script>
+
+</script>
 
 	<div><p>description.</p></div>
 
