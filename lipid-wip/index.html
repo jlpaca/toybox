@@ -1,0 +1,238 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+#pool {
+	width: 720px;
+	height: 720px;
+}
+
+</style>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>LIPID</h2>
+
+	<canvas id = "pool"></canvas>
+	<script src="../shared/v.js"></script>
+<script>
+function clip(x, a, b){
+	if (x < a) { return a; }
+	if (x > b) { return b; }
+	return x;
+}
+
+var Lipid = function(x, y, thet){
+	this.prev_hx = this.hx = x;
+	this.prev_hy = this.hy = y;
+
+	this.h = [x, y];
+	this.prev_x = [x, y];
+
+	this.prev_tx = this.tx = x+this.l*Math.cos(thet);
+	this.prev_ty = this.ty = y+this.l*Math.sin(thet);
+
+	this.prev_hx += Math.random()-0.5;
+	this.prev_hy += Math.random()-0.5;
+	this.prev_tx += Math.random()-0.5;
+	this.prev_ty += Math.random()-0.5;
+
+}
+
+// force curves.
+function sgm(x){ return 3*x/Math.sqrt(1+9*x*x); }
+function force_hh(r){
+	// sgm(x) approx 95% when x = 1.
+
+
+}
+function force_repulse(r){
+	r = clamp(r, 0.001, infinity)
+	return 1/r;
+}
+Lipid.prototype = {
+	hm: 1,		// head inv-mass
+	hx: 0, hy: 0,	// head location
+	prev_hx: 0,
+	prev_hy: 0,
+
+	tm: 1,		// tail inv-mass
+	tx: 0, ty: 0,	// tail location
+	prev_tx: 0,
+	prev_ty: 0,
+	l: 8,		// tail length
+	r: 2,		// ball radius
+	
+	fhx: 0, fhy: 0,	// accumulated forces
+	ftx: 0, fty: 0,	// on head and tail.
+
+	forces: function(lpd){
+		// add to self forces exerted
+		// by some other lipid particle
+
+		
+	},
+
+	motion: function(L, dt){
+		// verlet integration
+
+		next_hx =
+		2*this.hx-this.prev_hx+dt*dt*this.fhx*this.hm;
+		next_hy =
+		2*this.hy-this.prev_hy+dt*dt*this.fhy*this.hm;
+
+
+		next_tx =
+		2*this.tx-this.prev_tx+dt*dt*this.ftx*this.tm;
+		next_ty =
+		2*this.ty-this.prev_ty+dt*dt*this.fty*this.tm;
+
+		// length constraint. This preserves momentum and stuff.
+		var dx = next_hx-next_tx; var dy = next_hy-next_ty;
+		var d = Math.sqrt(dx*dx+dy*dy);
+		dx /= d; dy /= d; var err = this.l - d;
+		
+		var ratio = 0.5;
+
+		next_hx += ratio*err*dx;
+		next_hy += ratio*err*dy;
+		next_tx -= ratio*err*dx;
+		next_ty -= ratio*err*dy;
+
+		// TODO: add damping.
+
+		// torus boundary
+		next_hx = clip(next_hx, 0, L);
+		next_hy = clip(next_hy, 0, L);
+		next_tx = clip(next_tx, 0, L);
+		next_ty = clip(next_ty, 0, L);
+
+		// update
+		this.prev_hx = this.hx; this.prev_hy = this.hy;
+		this.prev_tx = this.tx; this.prev_ty = this.ty;
+
+		this.hx = next_hx; this.hy = next_hy;
+		this.tx = next_tx; this.ty = next_ty;
+
+		this.fhx = this.fhy = 0;
+		this.ftx = this.fty = 0;
+	},
+
+	draw: function(ctx){
+		// draw head
+		ctx.beginPath();
+		ctx.arc(this.hx, this.hy, this.r, 0, 2*Math.PI);
+		ctx.fill();
+
+		// draw stick
+		ctx.moveTo(this.hx, this.hy);
+		ctx.lineTo(this.tx, this.ty);
+		ctx.stroke();
+		
+		// beginPath() and stroke() might actually
+		// be more efficient here since things are
+		// small, performance tests pending.
+	}
+};
+
+var Pool = function(L, dt){
+	this.dt = dt;
+	this.L = L;
+
+	this.canv = document.getElementById('pool');
+	this.canv.width = this.canv.height = this.L;
+	this.ctx = this.canv.getContext("2d");
+}
+Pool.prototype = {
+
+	lipids: [],
+
+	addLipid: function(x, y, theta){
+		this.lipids.push(new Lipid(x, y, theta));
+	},
+	addRandomLipids: function(n){
+		for (var i = 0; i < n; ++i) {
+			this.addLipid(
+			Math.random()*this.L,
+			Math.random()*this.L,
+			Math.random()*Math.PI*2);
+		}
+	},
+
+	forces: function(){
+		// N^2 forces. do a spatial hash or something later.
+		for (var i = 0; i < this.lipids.length; ++i) {
+		for (var j = 0; j < this.lipids.length; ++j) {
+			this.lipids[i].forces(this.lipids[j]);
+		}}
+	},
+	motion: function(){
+		for (var i = 0; i < this.lipids.length; ++i) {
+			this.lipids[i].motion(this.L, this.dt);
+		}
+	},
+	render: function(){
+		this.ctx.clearRect(0, 0,
+		this.canv.width, this.canv.height);
+
+		for (var i = 0; i < this.lipids.length; ++i) {
+			this.lipids[i].draw(this.ctx);
+		}
+	},
+
+	timestep: function(){
+		this.forces();
+		this.motion(this.L, this.dt);
+		this.render(this.ctx);
+	},
+
+	run: function(){
+		this.timestep();
+		window.requestAnimationFrame(this.run.bind(this));
+	}
+};
+
+
+var pool = new Pool(720, 0.1);
+pool.addRandomLipids(100);
+
+pool.run();
+
+	</script>
+
+	<div><p>description.</p></div>
+
+	<div id = "credits">
+	J. Lok, [M] [yyyy].
+	</div>
+
+</div>
+
+
+</body>
+
+</html>
