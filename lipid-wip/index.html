@@ -25,8 +25,10 @@ h2 { font-size: 18px; }
 }
 
 #pool {
+	/*
 	width: 720px;
 	height: 720px;
+		*/
 }
 
 </style>
@@ -113,8 +115,8 @@ var Lipid = function(x, y, thet){
 		1);
 }
 Lipid.prototype = {
-	l: 8,
-	r: 2,
+	l: 7,
+	r: 1.5,
 
 	integrate: function(dt, L, damping){
 		// move individual ends
@@ -161,18 +163,22 @@ function ramp(near, far, threshold, width){
 	};
 }
 
+
 function force_hh(r){
-	return (ramp(-5, 0, 30, 10)(r) +
-		ramp(4, 0, 15, 8)(r) +
-		ramp(60, 0, 8, 2)(r));
+	return (ramp(-40,	-0.4,	20/3,	5/3	)(r) +
+		ramp(10, 	0.02,	40/3,	10/3	)(r) +
+
+		ramp(320,	0,	8,	2	)(r));
 }
 function force_tt(r){
-	return (ramp(-5, 0, 30, 10)(r) +
-		ramp(60, 0, 8, 2)(r));
+	return (ramp(-40,	-0.4,	20,	20/3	)(r) +
+
+		ramp(320,	0,	8,	2	)(r));
 }
 function force_ht(r){
-	return (ramp(5, 0, 30, 10)(r) +
-		ramp(60, 0, 8, 2)(r));
+	return (ramp(15,	0.38,	40/3,	10/3	)(r) +
+
+		ramp(320,	0,	8,	2	)(r));
 }
 function force(a, b, forcefunc){
 	var r = V2.sub(b.q, a.q);
@@ -184,13 +190,14 @@ function force(a, b, forcefunc){
 
 
 
-var Pool = function(L, dt, damping){
+var Pool = function(L, dt, damping, temp){
 	this.lipids = [];
 
 	this.L = L;
 	this.dt = dt;
 
 	this.damping = damping;
+	this.temperature = temp;
 
 	this.canv = document.getElementById('pool');
 	this.canv.width = this.canv.height = this.L;
@@ -218,8 +225,8 @@ Pool.prototype = {
 	forces: function(){
 	
 		// brownian
-		var b_mag = 12;
 		for (var i = 0; i < this.lipids.length; ++i) {
+			var b_mag = this.temperature;
 			this.lipids[i].head.f.set(
 				b_mag*2*Math.random()-b_mag,
 				b_mag*2*Math.random()-b_mag);
@@ -257,18 +264,34 @@ Pool.prototype = {
 	}
 }
 
-var pool = new Pool(500, 0.05, 0.02);
+var pool = new Pool(720, 0.02, 0.2, 30);
 
-var rand = 1;
+var rand = 2;
 
-if (rand) {
-pool.addRandomLipids(300);
+if (rand==1) {
+for (var i = 0; i < 44; ++i){
+pool.addLipid(200, 200+8*i, 0);
+pool.addLipid(226, 200+8*i, Math.PI);
+}
+
+} else if (rand == 2) {
+	pool.addRandomLipids(800);
 } else {
-for (var i = 0; i < 10; ++i) {
-for (var j = 0; j < 10; ++j) {
-	pool.addLipid(20+i*50+Math.random()*10, 20+j*20, Math.random()*2*Math.PI);
-	pool.addLipid(32+i*50, 20+j*20+Math.random()*10, Math.random()*2*Math.PI);
-}}
+var n =140;
+var t = Math.PI*2/n;
+for (var i = 0; i < n; ++i) {
+	pool.addLipid(
+	360+180*Math.cos(i*t),
+	360+180*Math.sin(i*t), i*t);
+}
+
+var m = 160;
+var u = Math.PI*2/m;
+for (var i = 0; i < m; ++i) {
+	pool.addLipid(
+	360+200*Math.cos(i*u),
+	360+200*Math.sin(i*u), i*u+Math.PI);
+}
 }
 pool.run();
 
