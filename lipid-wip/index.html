@@ -29,6 +29,7 @@ h2 { font-size: 18px; }
 	width: 720px;
 	height: 720px;
 		*/
+	border: 1px dashed #000000;
 }
 
 </style>
@@ -186,9 +187,17 @@ function force_tt(r){
 		ramp(320,	0,	8,	4,	15)(r));
 }
 function force_ht(r){
-	return (ramp(40,	0.4,	20,	5,	25)(r) +
+	return (ramp(60,	0.4,	20,	5,	25)(r) +
 
 		ramp(320,	0,	8,	4,	15)(r));
+}
+function force_ct(r){
+	return (ramp(80, 0.4, 40, 5, 90)(r) + 
+		ramp(320, 0, 12, 4, 20)(r));
+}
+function force_ch(r){
+	return (ramp(120, 0.4, 40, 5, 90)(r) + 
+		ramp(320, 0, 12, 4, 20)(r));
 }
 function force(a, b, forcefunc){
 	var r = V2.sub(b.q, a.q);
@@ -197,6 +206,40 @@ function force(a, b, forcefunc){
 
 	a.f.sub(r); b.f.add(r);
 }
+function repel(p, q, forcefunc){
+	var r = V2.sub(q, p.q);
+	var m = forcefunc(r.mag());
+	r.unit().mul(m);
+
+	p.f.sub(r);
+}
+
+var Cursor = function(elem){
+	this.q = new Vector2(0, 0);
+	this.elem = elem;
+
+	this.elem.addEventListener('contextmenu', this.contextmenu.bind(this));
+	this.elem.addEventListener('mousedown', this.mousedown.bind(this));
+	this.elem.addEventListener('mousemove', this.mousemove.bind(this));
+	this.elem.addEventListener('mouseup', this.mouseup.bind(this));
+	
+}
+Cursor.prototype = {
+	contextmenu: function(e){
+		e.preventDefault();
+	},
+	mousedown: function(e){
+		this.q.set(e.offsetX, e.offsetY);
+		this.action = e.button;
+	},
+	mousemove: function(e){
+		this.q.set(e.offsetX, e.offsetY);
+	},
+	mouseup: function(e){
+		this.q.set(e.offsetX, e.offsetY);
+		this.action = null;
+	},
+};
 
 
 
@@ -212,6 +255,8 @@ var Pool = function(L, dt, damping, temp){
 	this.canv = document.getElementById('pool');
 	this.canv.width = this.canv.height = this.L;
 	this.ctx = this.canv.getContext('2d');
+
+	this.cursor = new Cursor(this.canv);
 }
 Pool.prototype = {
 	addLipid: function(x, y, thet){
@@ -255,7 +300,15 @@ Pool.prototype = {
 			force(this.lipids[i].head, this.lipids[j].tail, force_ht);
 			force(this.lipids[j].head, this.lipids[i].tail, force_ht);
 		}}
-		
+
+		if (this.cursor.action === 0) {
+			console.log('repel');
+			for (var i = 0; i < this.lipids.length; ++i){
+			repel(this.lipids[i].head, this.cursor.q, force_ch);
+			repel(this.lipids[i].tail, this.cursor.q, force_ct);
+			}
+		}
+
 
 	},
 	render: function(){
@@ -263,8 +316,20 @@ Pool.prototype = {
 		for (var i = 0; i < this.lipids.length; ++i) {
 			this.lipids[i].draw(this.ctx);
 		}
+		this.ctx.beginPath();
+		this.ctx.arc(this.cursor.q.x, this.cursor.q.y,
+			4, 0, Math.PI*2);
+		this.ctx.stroke();
 	},
 	timestep: function(){
+
+		// content changes
+		if (this.cursor.action === 2){
+			this.addLipid(
+			this.cursor.q.x, this.cursor.q.y,
+			Math.random()*2*Math.PI);
+		}
+
 		this.forces();
 		this.integrate();
 		this.render();
@@ -275,9 +340,9 @@ Pool.prototype = {
 	}
 }
 
-var pool = new Pool(720, 0.04, 0.1, 40);
+var pool = new Pool(720, 0.04, 0.1, 60);
 
-var rand = 3;
+var rand = 1;
 // TODO: formalise test cases
 if (rand==1) {
 	for (var i = 0; i < 44; ++i){
