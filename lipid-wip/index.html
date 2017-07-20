@@ -153,32 +153,42 @@ Lipid.prototype = {
 // a sigmoid function that takes goes from 0 to 1
 function sgm(x){ return 0.5+2*x/Math.sqrt(1+16*x*x); }
 
-function ramp(near, far, threshold, width){
+function ramp(near, far, threshold, width, range){
+
 	// interpolates between near and far values, making
 	// jump at threshold with width being the distance
 	// from threshold required to nearly reach target value.
 	// beyond range, force is taken to be zero.
 	return function(r){
-		return near+sgm((r-threshold)/width)*(far-near);
+
+		//if (r > 5*range) { return 0; }
+		//if (r > range) { return far*Math.exp(-r+range); }
+
+		//return near+sgm((r-threshold)/width)*(far-near);
+
+		if (r > range+width*2) { return 0; }
+
+		return near+sgm((r-threshold)/width)*(far-near)-
+		sgm((r-range)/width)*far;
 	};
 }
 
 
 function force_hh(r){
-	return (ramp(-40,	-0.4,	20/3,	5/3	)(r) +
-		ramp(10, 	0.02,	40/3,	10/3	)(r) +
+	return (ramp(-40,	-0.4,	10,	2.5,	60)(r) +
+		ramp(10, 	0.02,	20,	5,	60)(r) +
 
-		ramp(320,	0,	8,	2	)(r));
+		ramp(320,	0,	8,	4,	15)(r));
 }
 function force_tt(r){
-	return (ramp(-40,	-0.4,	20,	20/3	)(r) +
+	return (ramp(-40,	-0.4,	30,	10,	60)(r) +
 
-		ramp(320,	0,	8,	2	)(r));
+		ramp(320,	0,	8,	4,	15)(r));
 }
 function force_ht(r){
-	return (ramp(15,	0.38,	40/3,	10/3	)(r) +
+	return (ramp(40,	0.4,	20,	5,	25)(r) +
 
-		ramp(320,	0,	8,	2	)(r));
+		ramp(320,	0,	8,	4,	15)(r));
 }
 function force(a, b, forcefunc){
 	var r = V2.sub(b.q, a.q);
@@ -236,6 +246,7 @@ Pool.prototype = {
 		}
 
 		// crummy N^2 thingy. TODO: spatial hash maybe
+		
 		for (var i = 0; i < this.lipids.length; ++i) {
 		for (var j = i+1; j < this.lipids.length; ++j) {
 			force(this.lipids[i].tail, this.lipids[j].tail, force_tt);
@@ -244,7 +255,7 @@ Pool.prototype = {
 			force(this.lipids[i].head, this.lipids[j].tail, force_ht);
 			force(this.lipids[j].head, this.lipids[i].tail, force_ht);
 		}}
-
+		
 
 	},
 	render: function(){
@@ -264,34 +275,45 @@ Pool.prototype = {
 	}
 }
 
-var pool = new Pool(720, 0.02, 0.2, 30);
+var pool = new Pool(720, 0.04, 0.1, 40);
 
-var rand = 2;
-
+var rand = 3;
+// TODO: formalise test cases
 if (rand==1) {
-for (var i = 0; i < 44; ++i){
-pool.addLipid(200, 200+8*i, 0);
-pool.addLipid(226, 200+8*i, Math.PI);
-}
+	for (var i = 0; i < 44; ++i){
+	pool.addLipid(200, 200+10*i, 0);
+	pool.addLipid(226, 200+10*i, Math.PI);
+	}
 
 } else if (rand == 2) {
-	pool.addRandomLipids(800);
-} else {
-var n =140;
-var t = Math.PI*2/n;
-for (var i = 0; i < n; ++i) {
-	pool.addLipid(
-	360+180*Math.cos(i*t),
-	360+180*Math.sin(i*t), i*t);
-}
+	pool.addRandomLipids(400);
 
-var m = 160;
-var u = Math.PI*2/m;
-for (var i = 0; i < m; ++i) {
-	pool.addLipid(
-	360+200*Math.cos(i*u),
-	360+200*Math.sin(i*u), i*u+Math.PI);
-}
+} else if (rand == 3) {
+	for (var i = 0; i < 20; ++i){
+	for (var j = 0; j < 20; ++j){
+		pool.addLipid(
+			10+30*i+Math.random()*5,
+			10+30*j+Math.random()*5,
+			Math.random()*2*Math.PI);
+	}}
+
+
+} else {
+	var n =140;
+	var t = Math.PI*2/n;
+	for (var i = 0; i < n; ++i) {
+		pool.addLipid(
+		360+180*Math.cos(i*t),
+		360+180*Math.sin(i*t), i*t);
+	}
+	
+	var m = 160;
+	var u = Math.PI*2/m;
+	for (var i = 0; i < m; ++i) {
+		pool.addLipid(
+		360+200*Math.cos(i*u),
+		360+200*Math.sin(i*u), i*u+Math.PI);
+	}
 }
 pool.run();
 
