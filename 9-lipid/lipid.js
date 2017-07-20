@@ -147,6 +147,10 @@ var Pool = function(L, dt, damping, temp){
 	this.ctx.fillStyle = "#ff6666";
 
 	this.cursor = new Cursor(this.canv);
+
+	window.addEventListener('keydown', function(e){
+		if (e.key == 'r') { this.clear(); }
+	}.bind(this));
 }
 Pool.prototype = {
 	addLipid: function(x, y, thet){
@@ -247,10 +251,22 @@ Pool.prototype = {
 	run: function(){
 		this.timestep();
 		window.requestAnimationFrame(this.run.bind(this));
-	}
+	},
+
+	clear: function(){
+		var clearver = 0;
+
+		return function(){
+			clearver = (clearver+1)%2
+			this.lipids = [];
+			if (clearver) {
+				this.addRandomLipids(400);
+			}
+		}
+	}()
 }
 
-var pool = new Pool(720, 0.04, 0.16, 60);
+var pool = new Pool(720, 0.04, 0.12, 60);
 
 
 // initial conditions: two circles, some other stuff
