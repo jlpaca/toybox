@@ -162,18 +162,17 @@ function ramp(near, far, threshold, width){
 }
 
 function force_hh(r){
-	return (ramp(-6, 0, 30, 10)(r) +
-		ramp(20, 0, 15, 5)(r) +
-		ramp(80, 0, 10, 3)(r));
+	return (ramp(-5, 0, 30, 10)(r) +
+		ramp(4, 0, 15, 8)(r) +
+		ramp(60, 0, 8, 2)(r));
 }
 function force_tt(r){
-	return 0;
-	return (ramp(-6, 0, 30, 10)(r) +
-		ramp(80, 0, 10, 3)(r));
+	return (ramp(-5, 0, 30, 10)(r) +
+		ramp(60, 0, 8, 2)(r));
 }
 function force_ht(r){
-	return (ramp(3, 0, 30, 10)(r) +
-		ramp(80, 0, 10, 3)(r));
+	return (ramp(5, 0, 30, 10)(r) +
+		ramp(60, 0, 8, 2)(r));
 }
 function force(a, b, forcefunc){
 	var r = V2.sub(b.q, a.q);
@@ -219,7 +218,7 @@ Pool.prototype = {
 	forces: function(){
 	
 		// brownian
-		var b_mag = 10;
+		var b_mag = 12;
 		for (var i = 0; i < this.lipids.length; ++i) {
 			this.lipids[i].head.f.set(
 				b_mag*2*Math.random()-b_mag,
@@ -232,8 +231,8 @@ Pool.prototype = {
 		// crummy N^2 thingy. TODO: spatial hash maybe
 		for (var i = 0; i < this.lipids.length; ++i) {
 		for (var j = i+1; j < this.lipids.length; ++j) {
-			force(this.lipids[i].head, this.lipids[j].head, force_hh);
 			force(this.lipids[i].tail, this.lipids[j].tail, force_tt);
+			force(this.lipids[i].head, this.lipids[j].head, force_hh);
 
 			force(this.lipids[i].head, this.lipids[j].tail, force_ht);
 			force(this.lipids[j].head, this.lipids[i].tail, force_ht);
@@ -258,14 +257,19 @@ Pool.prototype = {
 	}
 }
 
-var pool = new Pool(720, 0.05, 0.04);
-//pool.addRandomLipids(400);
+var pool = new Pool(500, 0.05, 0.02);
 
+var rand = 1;
+
+if (rand) {
+pool.addRandomLipids(300);
+} else {
 for (var i = 0; i < 10; ++i) {
 for (var j = 0; j < 10; ++j) {
-	pool.addLipid(20+i*50, 20+j*10, Math.random()*2*Math.PI);
-	pool.addLipid(32+i*50, 20+j*10, Math.random()*2*Math.PI);
+	pool.addLipid(20+i*50+Math.random()*10, 20+j*20, Math.random()*2*Math.PI);
+	pool.addLipid(32+i*50, 20+j*20+Math.random()*10, Math.random()*2*Math.PI);
 }}
+}
 pool.run();
 
 
