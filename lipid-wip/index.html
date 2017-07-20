@@ -97,12 +97,8 @@ Particle.prototype = {
 		this.prev_q = this.q;
 
 		this.q = new_q;
-
 		this.q.sub(V2.sub(this.q, this.prev_q).mul(damping));
 		
-		this.q.add(0, 0.1);
-		this.prev_q.add(0, 0.1);
-
 		this.f.set(0, 0);
 	}
 };
@@ -117,8 +113,8 @@ var Lipid = function(x, y, thet){
 		1);
 }
 Lipid.prototype = {
-	l: 10,
-	r: 2.2,
+	l: 8,
+	r: 2,
 
 	integrate: function(dt, L, damping){
 		// move individual ends
@@ -155,43 +151,36 @@ Lipid.prototype = {
 // a sigmoid function that takes goes from 0 to 1
 function sgm(x){ return 0.5+2*x/Math.sqrt(1+16*x*x); }
 
-function forcesgm(near, far, threshold, width, range){
+function ramp(near, far, threshold, width){
 	// interpolates between near and far values, making
 	// jump at threshold with width being the distance
 	// from threshold required to nearly reach target value.
 	// beyond range, force is taken to be zero.
 	return function(r){
-		if (r > range) { return 0; }
 		return near+sgm((r-threshold)/width)*(far-near);
 	};
 }
 
-var force_repl = forcesgm(120, 0, 6, 3, 50); // incompressibility force
-var force_hhrepl = forcesgm(1, 0, 20, 10, 50);
-
-function force_hh(h1, h2){
-	var r = V2.sub(h2.q, h1.q);
-	var repl = force_repl(r.mag())+force_hhrepl(r.mag());
-	var attr = forcesgm(-5, 0, 20, 50, 100)(r.mag());
-
-	r.unit().mul(attr+repl);
-	h1.f.sub(r); h2.f.add(r);
+function force_hh(r){
+	return (ramp(-6, 0, 30, 10)(r) +
+		ramp(20, 0, 15, 5)(r) +
+		ramp(80, 0, 10, 3)(r));
 }
-function force_tt(t1, t2){
-	var r = V2.sub(t2.q, t1.q);
-	var repl = force_repl(r.mag());
-	var attr = forcesgm(-8, 0, 20, 50, 100)(r.mag());
-
-	r.unit().mul(repl);
-	t1.f.sub(r); t2.f.add(r);
+function force_tt(r){
+	return 0;
+	return (ramp(-6, 0, 30, 10)(r) +
+		ramp(80, 0, 10, 3)(r));
 }
-function force_ht(h, t){
-	var r = V2.sub(t.q, h.q);
-	var repl = force_repl(r.mag());
-	var ht_repl = forcesgm(3, 0, 20, 50, 100)(r.mag());
+function force_ht(r){
+	return (ramp(3, 0, 30, 10)(r) +
+		ramp(80, 0, 10, 3)(r));
+}
+function force(a, b, forcefunc){
+	var r = V2.sub(b.q, a.q);
+	var m = forcefunc(r.mag());
+	r.unit().mul(m);
 
-	r.unit().mul(repl+ht_repl);
-	h.f.sub(r); t.f.add(r);
+	a.f.sub(r); b.f.add(r);
 }
 
 
@@ -230,7 +219,7 @@ Pool.prototype = {
 	forces: function(){
 	
 		// brownian
-		var b_mag = 3;
+		var b_mag = 10;
 		for (var i = 0; i < this.lipids.length; ++i) {
 			this.lipids[i].head.f.set(
 				b_mag*2*Math.random()-b_mag,
@@ -243,11 +232,11 @@ Pool.prototype = {
 		// crummy N^2 thingy. TODO: spatial hash maybe
 		for (var i = 0; i < this.lipids.length; ++i) {
 		for (var j = i+1; j < this.lipids.length; ++j) {
-			force_hh(this.lipids[i].head, this.lipids[j].head);
-			force_tt(this.lipids[i].tail, this.lipids[j].tail);
+			force(this.lipids[i].head, this.lipids[j].head, force_hh);
+			force(this.lipids[i].tail, this.lipids[j].tail, force_tt);
 
-			force_ht(this.lipids[i].head, this.lipids[j].tail);
-			force_ht(this.lipids[j].head, this.lipids[i].tail);
+			force(this.lipids[i].head, this.lipids[j].tail, force_ht);
+			force(this.lipids[j].head, this.lipids[i].tail, force_ht);
 		}}
 
 
@@ -269,13 +258,13 @@ Pool.prototype = {
 	}
 }
 
-var pool = new Pool(720, 0.05, 0.01);
-//pool.addRandomLipids(200);
+var pool = new Pool(720, 0.05, 0.04);
+//pool.addRandomLipids(400);
 
 for (var i = 0; i < 10; ++i) {
 for (var j = 0; j < 10; ++j) {
-	pool.addLipid(20+i*50, 20+j*10, Math.PI);
-	pool.addLipid(32+i*50, 20+j*10, 0);
+	pool.addLipid(20+i*50, 20+j*10, Math.random()*2*Math.PI);
+	pool.addLipid(32+i*50, 20+j*10, Math.random()*2*Math.PI);
 }}
 pool.run();
 
