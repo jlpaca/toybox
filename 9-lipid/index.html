@@ -1,0 +1,69 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>Spontaneous Formation of Protocell Structures</title>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #ff6363;
+	color: #ffa0a0;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; color: #ff9090; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+#pool {
+	/*
+	width: 720px;
+	height: 720px;
+		*/
+	cursor: default;
+}
+
+</style>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>SPONTANEOUS FORMATION OF PROTOCELL STRUCTURES</h2>
+
+	<canvas id = "pool"></canvas>
+<script src="../shared/V2.js"></script>
+<script src="../shared/cursor.js"></script>
+<script src="../shared/spash.js"></script>
+<script src="lipid.js"></script>
+
+	<div><p>
+		A toy model of lipid aggregate exhibiting self-assembly behaviour. The simulation here is modified from the model presented in Edwards, L. (1999), <i>Computational Models for the Formation of Protocell Structures</i>, Doctoral Dissertation; a different sigmoid functions is used, and interactions are optimised with a spatial hash.
+
+	<ul>
+		<li>LMB: exert force on lipids.</li>
+		<li>RMB: add lipids to solution.</li>
+	</ul>
+
+	</p></div>
+
+	<div id = "credits">
+	J. Lok, July 2017.
+	</div>
+
+</div>
+
+
+</body>
+
+</html>
