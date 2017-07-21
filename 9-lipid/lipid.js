@@ -1,3 +1,16 @@
+var pseudorandom = function(){
+	var table = [];
+	var current = 0;
+	for (var i = 0; i < 3000; ++i) {
+		table.push(Math.random());
+	}
+
+	return function(){
+		current = (current+1)%table.length;
+		return table[current];
+	};
+}();
+
 var Particle = function(x, y, m){
 	this.m = 1;
 	this.q = new Vector2(x, y);
@@ -80,26 +93,26 @@ function ramp(near, far, threshold, width, range){
 	// from threshold required to nearly reach target value.
 	// beyond range, force is taken to be zero.
 	return function(r){
-		if (r > range+width*2) { return 0; }
+		if (r > range) { return 0; }
 
 		return near+sgm((r-threshold)/width)*(far-near)-
-		sgm((r-range)/width)*far;
+		sgm((r-range+width*2)/width)*far;
 	};
 }
 
 
 function force_hh(r){
-	return (ramp(-40,	-0.4,	10,	2.5,	60)(r) +
-		ramp(10, 	0.02,	20,	5,	60)(r) +
-		ramp(320,	0,	8,	4,	15)(r));
+	return (ramp(-40,	-0.4,	10,	2.5,	70)(r) +
+		ramp(10, 	0.02,	20,	5,	70)(r) +
+		ramp(320,	0,	8,	4,	20)(r));
 }
 function force_tt(r){
-	return (ramp(-40,	-0.4,	30,	10,	60)(r) +
-		ramp(320,	0,	8,	4,	15)(r));
+	return (ramp(-40,	-0.4,	30,	10,	70)(r) +
+		ramp(320,	0,	8,	4,	20)(r));
 }
 function force_ht(r){
-	return (ramp(60,	0.4,	20,	5,	25)(r) +
-		ramp(320,	0,	8,	4,	15)(r));
+	return (ramp(54,	0.4,	20,	5,	30)(r) +
+		ramp(320,	0,	8,	4,	20)(r));
 }
 function force_ct(r){
 	return (ramp(80, 0.4, 60, 5, 60)(r) + 
@@ -159,9 +172,9 @@ Pool.prototype = {
 	addRandomLipids: function(n) {
 		for (var i = 0; i < n; ++i) {
 			this.addLipid(
-			Math.random()*this.L,
-			Math.random()*this.L,
-			Math.random()*2*Math.PI
+			pseudorandom()*this.L,
+			pseudorandom()*this.L,
+			pseudorandom()*2*Math.PI
 			);
 		}
 	},
@@ -177,11 +190,11 @@ Pool.prototype = {
 		for (var i = 0; i < this.lipids.length; ++i) {
 			var b_mag = this.temperature;
 			this.lipids[i].head.f.set(
-				b_mag*2*Math.random()-b_mag,
-				b_mag*2*Math.random()-b_mag);
+				b_mag*2*pseudorandom()-b_mag,
+				b_mag*2*pseudorandom()-b_mag);
 			this.lipids[i].tail.f.set(
-				b_mag*2*Math.random()-b_mag,
-				b_mag*2*Math.random()-b_mag);
+				b_mag*2*pseudorandom()-b_mag,
+				b_mag*2*pseudorandom()-b_mag);
 		}
 
 		
@@ -240,7 +253,7 @@ Pool.prototype = {
 		this.lipids.length < this.max_lipids){
 			this.addLipid(
 			this.cursor.q.x, this.cursor.q.y,
-			Math.random()*2*Math.PI);
+			pseudorandom()*2*Math.PI);
 		}
 
 		this.forces();
@@ -270,7 +283,7 @@ var pool = new Pool(720, 0.04, 0.12, 60);
 
 
 // initial conditions: two circles, some other stuff
-var n =60;
+var n = 60;
 var t = Math.PI*2/n;
 for (var i = 0; i < n; ++i) {
 	pool.addLipid(
@@ -288,11 +301,11 @@ for (var i = 0; i < n; ++i) {
 
 n = 100;
 for (var i = 0; i < n; ++i) {
-	var t = Math.random()*2*Math.PI;
+	var t = pseudorandom()*2*Math.PI;
 	pool.addLipid(
-	360+Math.cos(t)*(0.8+Math.random())*200,
-	360+Math.sin(t)*(0.8+Math.random())*200,
-	Math.random()*2*Math.PI);
+	360+Math.cos(t)*(0.8+pseudorandom())*200,
+	360+Math.sin(t)*(0.8+pseudorandom())*200,
+	pseudorandom()*2*Math.PI);
 }
 
 pool.run();
