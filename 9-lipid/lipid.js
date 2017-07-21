@@ -68,6 +68,14 @@ Lipid.prototype = {
 			this.head.q.y -= L; this.head.prev_q.y -= L;
 			this.tail.q.y -= L; this.tail.prev_q.y -= L;
 		}
+		while (this.head.q.x < 0) {
+			this.head.q.x += L; this.head.prev_q.x += L;
+			this.tail.q.x += L; this.tail.prev_q.x += L;
+		}
+		while (this.head.q.y < 0) {
+			this.head.q.y += L; this.head.prev_q.y += L;
+			this.tail.q.y += L; this.tail.prev_q.y += L;
+		}
 	},
 	draw: function(ctx){
 		ctx.beginPath();
@@ -111,7 +119,7 @@ function force_tt(r){
 		ramp(320,	0,	8,	4,	20)(r));
 }
 function force_ht(r){
-	return (ramp(54,	0.4,	20,	5,	30)(r) +
+	return (ramp(62,	0.4,	20,	5,	30)(r) +
 		ramp(320,	0,	8,	4,	20)(r));
 }
 function force_ct(r){
