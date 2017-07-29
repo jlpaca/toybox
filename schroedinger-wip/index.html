@@ -26,8 +26,8 @@ h2 { font-size: 18px; }
 
 /* WORLD*/
 
-#world {
-	border: 1px #ccc none;/*dashed;*/
+#canv {
+	border: 1px #ccc dashed;
 
 	margin: 4px auto;
 
@@ -82,18 +82,30 @@ shoot: function(E){ // returns phi at the other end of the range
 	var phi_prev = -1;
 	var phi_next;
 
+	var f = this.f(E, x);
+	var f_prev = this.f(E, x-this.dx);
+	var f_next;
+
+	var b = this.dx*this.dx/12;
+
 	//var intg = 0;	// normalisation not needed, this
 			// function used to determine sign
 			// only.
 
 	for (var i = 0; i < this.N; ++i) {
 
-		phi_next = 2*phi - phi_prev +
-		this.dx*this.dx*this.f(E, x)*phi;
-		x += this.dx;
+		f_next = this.f(E, x+this.dx);
+
+		//phi_next = 2*phi - phi_prev + this.dx*this.dx*f*phi; // verlet
+		phi_next = (2*phi*(1+5*b*f) - phi_prev*(1-b*f_prev))/(1-b*f_next);
 
 		phi_prev = phi;
 		phi = phi_next;
+
+		f_prev = f;
+		f = f_next;
+
+		x += this.dx;
 
 		//intg += 0.5*this.dx*(phi*phi + phi_prev*phi_prev);
 	}
@@ -108,12 +120,24 @@ integrate: function(E){ // returns an array
 	phi[-1] = -1;
 	phi[0] = 0;
 
+	var f = this.f(E, x);
+	var f_prev = this.f(E, x-this.dx);
+	var f_next;
+
 	var x = -this.x_max;
 	var intg = 0;
 
+	var b = this.dx*this.dx/12;
+
 	for (var i = 0; i < this.N; ++i) {
-		phi[i+1] = 2*phi[i] - phi[i-1] +
-		this.dx*this.dx*this.f(E, x)*phi[i];
+
+		f_next = this.f(E, x+this.dx);
+
+		//phi[i+1] = 2*phi[i] - phi[i-1] + this.dx*this.dx*f*phi[i];
+		phi[i+1] = (2*phi[i]*(1+5*b*f) - phi[i-1]*(1-b*f_prev))/(1-b*f_next);
+
+		f_prev = f;
+		f = f_next;
 
 		x += this.dx;
 		intg += 0.5*this.dx*(phi[i+1]*phi[i+1]+phi[i]*phi[i]);
@@ -126,7 +150,7 @@ integrate: function(E){ // returns an array
 	return phi;
 },
 
-eigensolve: function(){
+eigensolve: function(N){
 
 	// returns [ E1, E2 ] bracketing energies
 	var eigenbracket = function(E_min, E_max, dE){
@@ -180,8 +204,7 @@ eigensolve: function(){
 
 	this.E_n = [];
 	var E_start = 0;
-	var E_end = 100;
-	var N = 4; // find first N eigenvalues
+	var E_end = 100; // loop runs indefinitteelllyyy
 
 	for (var i = 0; i < N; ++i) {
 		var bracket = eigenbracket(E_start, E_end, 0.01);
@@ -191,7 +214,7 @@ eigensolve: function(){
 		}
 
 		var Ei = eigenbisect(bracket[0], bracket[1], 1e-5);
-		//console.log('found: E_' + i + ' = ' + Ei);
+		console.log('E_' + i + ' = ' + Ei);
 
 		// add the found eigenfunction & energy to list
 		this.E_n[i] = Ei;
@@ -205,11 +228,39 @@ eigensolve: function(){
 
 };
 
+// draws f, an array of values, on ctx
+function graph(ctx, f, yscale){
+	var n = f.length-1;
+
+	var w = ctx.canvas.width;
+	var h = ctx.canvas.height;
+
+	var wprop = 1.0;
+	var hprop = 1.0;
+
+	var dx = w*wprop/n;
+	var dy = h*hprop/2/yscale;
+
+	ctx.beginPath();
+	ctx.moveTo(0, h/2);
+	for (var i = 0; i < f.length; ++i) {
+		ctx.lineTo(dx*i, -f[i]*dy+h/2);
+	}
+	ctx.stroke();
+
+}
+
+
+
 var canv = document.getElementById('canv');
 var ctx = canv.getContext('2d');
 
 var sch = new Schroedinger();
-sch.eigensolve();
+sch.eigensolve(4);
+graph(ctx, sch.phi_n[0], 2);
+graph(ctx, sch.phi_n[1], 2);
+graph(ctx, sch.phi_n[2], 2);
+graph(ctx, sch.phi_n[3], 2);
 
 	</script>
 
