@@ -1,0 +1,227 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+<script>
+
+
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>TITLE</h2>
+
+	<canvas id = "canv" width = "720" height = "720"></canvas>
+	<script>
+
+var Schroedinger = function(){
+	this.x_max = 1;	// integration range -x_max to x_max
+	this.dx = 1e-2;	// space discretisation
+	this.N = 2*this.x_max/this.dx;
+
+	// potential function
+	this.V = function(x) {
+		return 0;
+	};
+
+	this.E_n = [];	// list of energy eigenvalues
+	this.phi_n = [];	// list of eigenstates
+
+
+};
+Schroedinger.prototype = {
+f: function(E, x) {
+	return 2*(this.V(x)-E);
+},
+
+shoot: function(E){ // returns phi at the other end of the range
+
+	var x = -this.x_max;
+
+	var phi = 0;
+	var phi_prev = -1;
+	var phi_next;
+
+	//var intg = 0;	// normalisation not needed, this
+			// function used to determine sign
+			// only.
+
+	for (var i = 0; i < this.N; ++i) {
+
+		phi_next = 2*phi - phi_prev +
+		this.dx*this.dx*this.f(E, x)*phi;
+		x += this.dx;
+
+		phi_prev = phi;
+		phi = phi_next;
+
+		//intg += 0.5*this.dx*(phi*phi + phi_prev*phi_prev);
+	}
+	//phi /= Math.sqrt(intg);
+
+	return phi;
+},
+
+integrate: function(E){ // returns an array
+
+	var phi = [];
+	phi[-1] = -1;
+	phi[0] = 0;
+
+	var x = -this.x_max;
+	var intg = 0;
+
+	for (var i = 0; i < this.N; ++i) {
+		phi[i+1] = 2*phi[i] - phi[i-1] +
+		this.dx*this.dx*this.f(E, x)*phi[i];
+
+		x += this.dx;
+		intg += 0.5*this.dx*(phi[i+1]*phi[i+1]+phi[i]*phi[i]);
+	}
+	delete phi[-1];
+
+	intg = Math.sqrt(intg);
+	for (var i = 0; i < this.N+1; ++i) { phi[i] /= intg; }
+
+	return phi;
+},
+
+eigensolve: function(){
+
+	// returns [ E1, E2 ] bracketing energies
+	var eigenbracket = function(E_min, E_max, dE){
+		
+		var E1 = E_min;
+		var E2;
+	
+		var phi1 = this.shoot(E1);
+		var phi2;
+
+		var res = undefined;
+	
+		// first find bracketing energies
+		while ((E2 = E1 + dE) <= E_max) {
+	
+			var phi2 = this.shoot(E2);
+			if (phi1*phi2 < 0) {
+				//console.log('bracketing energies: ' +
+				//E1 + ', ' + E2);
+
+				res = [ E1, E2 ];
+				break;
+			}
+	
+			phi1 = phi2;
+			E1 = E2;
+		}
+
+		return res;
+	}.bind(this);
+	
+	// returns eigenstate energy to within epsilon
+	var eigenbisect = function(E_min, E_max, epsilon){
+		var E_mid;
+		var phi_min, phi_mid, phi_max;
+
+		while (E_max-E_min > epsilon) {
+			E_mid = (E_min + E_max)/2;
+
+			phi_min = this.shoot(E_min);
+			phi_max = this.shoot(E_max);
+			phi_mid = this.shoot(E_mid);
+
+			(phi_mid * phi_max < 0)?
+			(E_min = E_mid):(E_max = E_mid);
+		}
+
+		return E_mid;
+	}.bind(this);
+
+
+	this.E_n = [];
+	var E_start = 0;
+	var E_end = 100;
+	var N = 4; // find first N eigenvalues
+
+	for (var i = 0; i < N; ++i) {
+		var bracket = eigenbracket(E_start, E_end, 0.01);
+		if (!bracket) {
+			console.log('failed');
+			return false;
+		}
+
+		var Ei = eigenbisect(bracket[0], bracket[1], 1e-5);
+		//console.log('found: E_' + i + ' = ' + Ei);
+
+		// add the found eigenfunction & energy to list
+		this.E_n[i] = Ei;
+		this.phi_n[i] = this.integrate(Ei);
+
+
+		E_start = bracket[1];
+	}
+	
+}
+
+};
+
+var canv = document.getElementById('canv');
+var ctx = canv.getContext('2d');
+
+var sch = new Schroedinger();
+sch.eigensolve();
+
+	</script>
+
+	<div><p>description.</p></div>
+
+	<div id = "credits">
+	J. Lok, [M] [yyyy].
+	</div>
+
+</div>
+
+
+</body>
+
+</html>
