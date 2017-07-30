@@ -269,17 +269,28 @@ function graph(ctx, f, yscale){
 
 }
 
+// dot product for orthonormality checks.
+function dot(f1, f2, dx){
+	var intg = 0;
+	var L = Math.max(f1.length, f2.length);
+	for (var i = 0; i < f1.length-1; ++i) {
+		intg += 0.5*dx*(f1[i]*f2[i]+f1[i+1]*f2[i+1])
+	}
+	return intg;
+}
+
 
 
 var canv = document.getElementById('canv');
 var ctx = canv.getContext('2d');
 
 var sch = new Schroedinger();
-sch.eigensolve(4);
-graph(ctx, sch.phi_n[0], 2);
-graph(ctx, sch.phi_n[1], 2);
-graph(ctx, sch.phi_n[2], 2);
-graph(ctx, sch.phi_n[3], 2);
+var N = 10;
+sch.eigensolve(N);
+
+for (var i = 0; i < N; ++i) {
+	graph(ctx, sch.phi_n[i], 2);
+}
 
 	</script>
 
