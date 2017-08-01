@@ -341,20 +341,28 @@ function start(){
 
 	/* handlers */
 	window.addEventListener('keydown', function(e){
-		if ('0' <= e.key && e.key <= '9' && !state[e.key]) {
+		var n = parseInt(e.key);
+		if (0 <= n && n <= 9 && !state[n]) {
+			e.preventDefault();
+
 			state[e.key] = 1;
 			++num;
 			var prop = 1/Math.sqrt(num);
 			for (var i = 0; i < state.length; ++i) {
 				if (state[i]) { state[i] = prop; }
 			}
-		} else if (e.key == 'p') {
+		}
+		if (e.keyCode == 32) {
+			e.preventDefault();
 			prob = true;
 		}
 	});
 	
 	window.addEventListener('keyup', function(e){
-		if ('0' <= e.key && e.key <= '9' && state[e.key]) {
+		var n = parseInt(e.key);
+		if (0 <= n && n <= 9 && state[n]) {
+			e.preventDefault();
+
 			state[e.key] = 0;
 			--num;
 
@@ -362,7 +370,9 @@ function start(){
 			for (var i = 0; i < state.length; ++i) {
 				if (state[i]) { state[i] = prop; }
 			}
-		} else if (e.key == 'p') {
+		}
+		if (e.keyCode == 32) {
+			e.preventDefault();
 			prob = false;
 		}
 	});
