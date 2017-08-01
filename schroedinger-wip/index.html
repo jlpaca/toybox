@@ -291,10 +291,6 @@ function dot(f1, f2, dx){
 var Wave = function(sch, psi){
 	this.sch = sch;
 
-	// real & imaginary parts of function
-	this.Re = [];
-	this.Im = [];
-
 	this.components = []; // this.sch.E_n.length;
 
 	this.from(psi);
@@ -339,20 +335,27 @@ Wave.prototype = {
 		}
 		return components;
 	},
-	evolve: function(t){
+	evolve: function(comp, t){
 
+		var Re = [];
+		var Im = [];
+		var prob=  [];
 		for (var j = 0; j < this.sch.N+1; ++j) {
-		this.Re[j] = this.Im[j] =  0;
+		Re[j] = Im[j] =  0;
 
 		for (var i = 0; i < this.sch.phi_n.length; ++i) {
-			this.Re[j] += 
+			Re[j] += 
 			Math.cos(this.sch.E_n[i]*t)*
-			this.sch.phi_n[i][j]*this.components[i];
+			this.sch.phi_n[i][j]*comp[i];
 
-			this.Im[j] += 
+			Im[j] += 
 			Math.sin(this.sch.E_n[i]*t)*
-			this.sch.phi_n[i][j]*this.components[i];
+			this.sch.phi_n[i][j]*comp[i];
+
+			prob[j] = Im[j]*Im[j] + Re[j]*Re[j];
 		}}
+
+		return { Re: Re, Im: Im, prob: prob };
 	}
 };
 
@@ -365,7 +368,7 @@ ctx.lineWidth = 8;
 /* solve eigenvalue problem */
 var sch = new Schroedinger();
 
-var N = 14; 
+var N = 16; 
 sch.eigensolve(N);
 
 /* check for orthogonality */
@@ -386,21 +389,69 @@ var wave = new Wave(sch, function(x){
 /* graph eigenvalues */
 //for (var i = 0; i < N; ++i) { graph(ctx, sch.phi_n[i], 1.5); }
 
+function start(){
+	
+	var t = 0;
+	var dt = 0.01;
+	var state = [];
+	var num = 0;
+	var prob = false;
+	for (var i = 0; i < sch.phi_n.length; ++i) {
+		state[i] = 0;
+	}
 
-var t = 0; var dt = 0.01;
-window.setInterval(function(){
-wave.evolve(t); t += dt;
-graph(ctx, wave.Re, 1.5, 1, 'rgba(0, 255, 255, 0.5)');
-graph(ctx, wave.Im, 1.5, 0, 'rgba(255, 130, 255, 0.5)');
+	/* handlers */
+	window.addEventListener('keydown', function(e){
+		if ('0' <= e.key && e.key <= '9' && !state[e.key]) {
+			state[e.key] = 1;
+			++num;
+			var prop = 1/Math.sqrt(num);
+			for (var i = 0; i < state.length; ++i) {
+				if (state[i]) { state[i] = prop; }
+			}
+		} else if (e.key == 'p') {
+			prob = true;
+		}
+	});
+	
+	window.addEventListener('keyup', function(e){
+		if ('0' <= e.key && e.key <= '9' && state[e.key]) {
+			state[e.key] = 0;
+			--num;
 
-}, 20);
+			var prop = 1/Math.sqrt(num);
+			for (var i = 0; i < state.length; ++i) {
+				if (state[i]) { state[i] = prop; }
+			}
+		} else if (e.key == 'p') {
+			prob = false;
+		}
+	});
+	
+	window.setInterval(function(){
+		var wav = num?wave.evolve(state, t):wave.evolve(wave.components, t);
+		prob?
+		graph(ctx, wav.prob, 1.5, 1, 'rgba(160, 160, 160, 0.5)'):
+		(graph(ctx, wav.Re, 1.5, 1, 'rgba(0, 255, 255, 0.5)'),
+		graph(ctx, wav.Im, 1.5, 0, 'rgba(255, 130, 255, 0.5)'));
 
+		t += dt;
+	
+	}, 20);
+}
 
-
+start();
 
 	</script>
 
-	<div><p>The real (cyan) and imaginary (magenta) parts of the wave function of a quantum harmonic oscillator. The time-independent Schrödinger equation is solved with a shooting method to obtain the first 14 eigenvalues, by which an initial wave function is approximated, and time evolution is applied.</p></div>
+	<div><p>The real (cyan) and imaginary (magenta) parts of the wave function of a quantum harmonic oscillator. The time-independent Schrödinger equation is solved with a shooting method to obtain the first 14 eigenvalues, by which an initial wave function is approximated, and time evolution is applied. The initial wave function here is <i>exp(-x<sup>2</sup>)</i>, scaled horizontally, shifted to the right, and normalised. </p>
+	
+	<ul>
+		<li>0-9: display the first 10 eigenfunctions individually.</li>
+		<li>P: display probability amplitude.</li>
+	</ul>
+
+	</div>
 
 	<div id = "credits">
 	J. Lok, August 2017.
