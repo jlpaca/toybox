@@ -231,20 +231,20 @@ function clickHandler(e){
 	CAPTURE_MAP = true;
 }
 function keydownHandler(e){
-	if(e.keyCode == 32){ //space
+	if(e.keyCode == 32){ e.preventDefault(); // space
 		SKID = !SKID;
 
-	} else if (e.keyCode == 38){ //up
+	} else if (e.keyCode == 38){ e.preventDefault(); // up
 		WAVE_MAGNITUDE = Math.max(0.2, Math.min(3.0, WAVE_MAGNITUDE+0.2));
 		//console.log(WAVE_MAGNITUDE);
-	} else if (e.keyCode == 40){ //down
+	} else if (e.keyCode == 40){ e.preventDefault(); // left
 		WAVE_MAGNITUDE = Math.max(0.2, Math.min(3.0, WAVE_MAGNITUDE-0.2));
 		//console.log(WAVE_MAGNITUDE);
 
-	} else if (e.keyCode == 39){ //right
+	} else if (e.keyCode == 39){ e.preventDefault(); // right
 		WAVE_SCALE = Math.max(0.2, Math.min(3.0, WAVE_SCALE+0.2));
 		//console.log(WAVE_SCALE);
-	} else if (e.keyCode == 37){ //down
+	} else if (e.keyCode == 37){ e.preventDefault(); // down
 		WAVE_SCALE = Math.max(0.2, Math.min(3.0, WAVE_SCALE-0.2));
 		//console.log(WAVE_SCALE);
 	}

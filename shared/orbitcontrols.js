@@ -159,6 +159,7 @@ Orbitcontrols.prototype.mouseuphandler = function(e){
 }
 
 Orbitcontrols.prototype.wheelhandler = function(e){
+	e.preventDefault();
 	this.qspherical.r = Math.min(Math.max(
 		this.qspherical_limits[0],
 		this.qspherical.r + e.deltaY*this.dollyrate),

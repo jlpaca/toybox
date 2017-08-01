@@ -80,6 +80,7 @@ function mousemoveHandler(e){
 	cursor[1] = 1.0-(e.clientY - rect.top)/rect.height;
 }
 function wheelHandler(e){
+	e.preventDefault();
 	if (e.deltaY < 0) {
 		cursor[2] += 0.02;
 	} else {

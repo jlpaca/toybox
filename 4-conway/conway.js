@@ -38,7 +38,10 @@ function mouseupHandler(e){
 }
 function keydownHandler(e){
 	console.log(e.keyCode);
-	if(e.keyCode == 32){ RUN = !RUN; }
+	if(e.keyCode == 32){
+		e.preventDefault();
+		RUN = !RUN;
+	}
 	else if(e.keyCode == 82){ killAll(); }
 }
 

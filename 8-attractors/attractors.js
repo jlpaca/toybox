@@ -300,11 +300,11 @@ function init(){
 }
 function keydownHandler(e){
 	var pupd = false;
-	if (e.which == 32) {
+	if (e.which == 32) { e.preventDefault();
 		D.reset();
-	} else if (e.which == 39) {
+	} else if (e.which == 39) { e.preventDefault();
 		next();
-	} else if (e.which == 37) {
+	} else if (e.which == 37) { e.preventDefault();
 		// left arrow - last system
 		prev();
 	} else if (48 < e.which && e.which < 52 &&

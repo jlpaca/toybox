@@ -227,9 +227,12 @@ function mousedownHandler(e){
 function keydownHandler(e){
 	console.log(e.which);
 	if (e.which == 32){ // SPACEBAR
+		e.preventDefault();
 		timetoggle();
 	}
 	if (e.which == 27){ // ESC
+		e.preventDefault();
+
 		selP = null;
 		updateNewC();
 	}
