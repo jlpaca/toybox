@@ -242,7 +242,12 @@ eigensolve: function(N){
 };
 
 // draws f, an array of values, on ctx
-function graph(ctx, f, yscale){
+function graph(ctx, f, yscale, clear){
+	if (clear) {
+		ctx.clearRect(0, 0,
+		ctx.canvas.width, ctx.canvas.height);
+	}
+
 	var n = f.length-1;
 
 	var w = ctx.canvas.width;
@@ -275,7 +280,10 @@ function dot(f1, f2, dx){
 
 var Wave = function(sch, psi){
 	this.sch = sch;
-	this.val = [];
+
+	// real & imaginary parts of function
+	this.Re = [];
+	this.Im = [];
 
 	this.components = []; // this.sch.E_n.length;
 
@@ -284,7 +292,7 @@ var Wave = function(sch, psi){
 Wave.prototype = {
 	from: function(f){
 		this.components = this.decompose(this.generate(f));
-		this.recompose();
+		this.evolve(0);
 	},
 	generate: function(f){
 		// returns an array representing a normalised
@@ -321,10 +329,19 @@ Wave.prototype = {
 		}
 		return components;
 	},
-	recompose: function(){
-		for (var j = 0; j < this.sch.N+1; ++j) { this.val[j] = 0;
+	evolve: function(t){
+
+		for (var j = 0; j < this.sch.N+1; ++j) {
+		this.Re[j] = this.Im[j] =  0;
+
 		for (var i = 0; i < this.sch.phi_n.length; ++i) {
-			this.val[j] += this.sch.phi_n[i][j]*this.components[i];
+			this.Re[j] += 
+			Math.cos(this.sch.E_n[i]*t)*
+			this.sch.phi_n[i][j]*this.components[i];
+
+			this.Im[j] += 
+			Math.sin(this.sch.E_n[i]*t)*
+			this.sch.phi_n[i][j]*this.components[i];
 		}}
 	}
 };
@@ -337,7 +354,7 @@ var ctx = canv.getContext('2d');
 /* solve eigenvalue problem */
 var sch = new Schroedinger();
 
-var N = 6; 
+var N = 12; 
 sch.eigensolve(N);
 
 /* check for orthogonality */
@@ -356,7 +373,15 @@ var wave = new Wave(sch, function(x){
 });
 
 //for (var i = 0; i < N; ++i) { graph(ctx, sch.phi_n[i], 1.5); }
-graph(ctx, wave.val, 1.5);
+
+var t = 0; var dt = 0.01;
+window.setInterval(function(){
+	console.log('tick');
+wave.evolve(t); t += dt;
+graph(ctx, wave.Re, 1.5, 1);
+graph(ctx, wave.Im, 1.5, 0);
+
+}, 0);
 
 	</script>
 
