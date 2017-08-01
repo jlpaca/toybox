@@ -55,15 +55,13 @@ h2 { font-size: 18px; }
 	<script>
 
 var Schroedinger = function(){
-	this.x_max = 6;	// integration range -x_max to x_max
-	this.dx = 0.05;	// space discretisation
+	this.x_max = 4;	// integration range -x_max to x_max
+	this.dx = 0.01;// space discretisation
 	this.N = 2*this.x_max/this.dx;
 
 	// potential function
 	this.V = function(x) {
-		//return 0;
-		//return Math.abs(x) > 0.7?6000:0;
-		return x*x;
+		return 2*x*x;
 	};
 
 	this.E_n = [];	// list of energy eigenvalues
@@ -81,7 +79,7 @@ shoot: function(E){ // returns phi at the other end of the range
 	var x = -this.x_max;
 
 	var phi = 0;
-	var phi_prev = -1;
+	var phi_prev = -0.1;
 	var phi_next;
 
 	var f = this.f(E, x);
@@ -90,7 +88,7 @@ shoot: function(E){ // returns phi at the other end of the range
 
 	var b = this.dx*this.dx/12;
 
-	var intg = 0;	// normalisation not needed, this
+	//var intg = 0;	// normalisation not needed, this
 			// function used to determine sign
 			// only.
 
@@ -109,9 +107,9 @@ shoot: function(E){ // returns phi at the other end of the range
 
 		x += this.dx;
 
-		intg += 0.5*this.dx*(phi*phi + phi_prev*phi_prev);
+		//intg += 0.5*this.dx*(phi*phi + phi_prev*phi_prev);
 	}
-	phi /= Math.sqrt(intg);
+	//phi /= Math.sqrt(intg);
 
 	return phi;
 },
@@ -119,7 +117,7 @@ shoot: function(E){ // returns phi at the other end of the range
 integrate: function(E){ // returns an array
 
 	var phi = [];
-	phi[-1] = -1;
+	phi[-1] = -0.1;
 	phi[0] = 0;
 
 	var x = -this.x_max;
@@ -171,9 +169,6 @@ eigensolve: function(N){
 	
 			var phi2 = this.shoot(E2);
 			if (phi1*phi2 < 0) {
-				//console.log('bracketing energies: ' +
-				//E1 + ', ' + E2);
-
 				res = [ E1, E2 ];
 				break;
 			}
@@ -194,11 +189,10 @@ eigensolve: function(N){
 		var phi_max = this.shoot(E_max);
 
 		var iter = 0;
-		var max_iter = 10000;
+		var max_iter = 60;
 
 		while (Math.abs(phi_mid - phi_target) > epsilon &&
 		iter < max_iter) {
-
 			if (phi_mid*phi_max < 0) {
 				E_min = E_mid;
 				phi_min = phi_mid;
@@ -214,7 +208,7 @@ eigensolve: function(N){
 		}
 		if (Math.abs(phi_mid - phi_target) > epsilon) {
 			console.log('! bisection failed to converge (' +
-			phi_mid + ' left)');
+			phi_mid + ')');
 		}
 
 		return E_mid;
@@ -233,7 +227,7 @@ eigensolve: function(N){
 		}
 
 		var Ei = eigenbisect(bracket[0], bracket[1], 0, 1e-6);
-		//console.log('E_' + i + ' = ' + Ei);
+		console.log('E_' + i + ' = ' + Ei);
 
 		// add the found eigenfunction & energy to list
 		this.E_n[i] = Ei;
@@ -279,18 +273,90 @@ function dot(f1, f2, dx){
 	return intg;
 }
 
+var Wave = function(sch, psi){
+	this.sch = sch;
+	this.val = [];
+
+	this.components = []; // this.sch.E_n.length;
+
+	this.from(psi);
+};
+Wave.prototype = {
+	from: function(f){
+		this.components = this.decompose(this.generate(f));
+		this.recompose();
+	},
+	generate: function(f){
+		// returns an array representing a normalised
+		// wave function
+
+		var psi = []; var intg = 0;
+		var x = -this.sch.x_max;
+
+		psi[0] = f(x);
+		for (var i = 0; i < this.sch.N; ++i) {
+			x += this.sch.dx;
+
+			psi[i+1] = f(x);
+
+			intg += 0.5*this.sch.dx*
+				(psi[i]*psi[i]+	psi[i+1]*psi[i+1]);
+		}
+
+		// normalise
+		intg = Math.sqrt(intg);
+		for (var i = 0; i < this.sch.N+1; ++i) {
+			psi[i] /= intg;
+		}
+		return psi;
+	},
+	decompose: function(val){
+		// returns a decomposition of f as
+		// eigenvalues of associated schroedinger eq.
+
+		var components = [];
+		for (var i = 0; i < this.sch.phi_n.length; ++i) {
+			components[i] = dot(val,
+			this.sch.phi_n[i], this.sch.dx);
+		}
+		return components;
+	},
+	recompose: function(){
+		for (var j = 0; j < this.sch.N+1; ++j) { this.val[j] = 0;
+		for (var i = 0; i < this.sch.phi_n.length; ++i) {
+			this.val[j] += this.sch.phi_n[i][j]*this.components[i];
+		}}
+	}
+};
 
 
+/* initialise graphics */
 var canv = document.getElementById('canv');
 var ctx = canv.getContext('2d');
 
+/* solve eigenvalue problem */
 var sch = new Schroedinger();
-var N = 10;
+
+var N = 6; 
 sch.eigensolve(N);
 
-for (var i = 0; i < N; ++i) {
-	graph(ctx, sch.phi_n[i], 2);
-}
+/* check for orthogonality */
+/*
+for (var i = 0; i < sch.phi_n.length; ++i) {
+for (var j = i; j < sch.phi_n.length; ++j) {
+console.log('phi_' + i + '*phi_' + j + ': ' + 
+dot(sch.phi_n[i], sch.phi_n[j], sch.dx).toFixed(8));
+}}
+*/
+
+/* express initial conditions */
+var wave = new Wave(sch, function(x){
+	x = x-1.5;
+	return 3*Math.exp(-x*x);
+});
+
+//for (var i = 0; i < N; ++i) { graph(ctx, sch.phi_n[i], 1.5); }
+graph(ctx, wave.val, 1.5);
 
 	</script>
 
