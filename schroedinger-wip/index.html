@@ -67,7 +67,7 @@ var Schroedinger = function(){
 	// potential function
 	this.V = function(x) {
 		//return 0;
-		return 2*x*x;
+		return 2.1*x*x;
 	};
 
 	this.E_n = [];	// list of energy eigenvalues
@@ -84,13 +84,13 @@ shoot: function(E){ // returns phi at the other end of the range
 
 	var x = -this.x_max;
 
-	var phi = 0;
-	var phi_prev = -0.1;
-	var phi_next;
-
 	var f = this.f(E, x);
 	var f_prev = this.f(E, x-this.dx);
 	var f_next;
+
+	var phi = Math.exp(Math.sqrt(f)*x);
+	var phi_prev = -0.1;
+	var phi_next;
 
 	var b = this.dx*this.dx/12;
 
@@ -122,15 +122,16 @@ shoot: function(E){ // returns phi at the other end of the range
 
 integrate: function(E){ // returns an array
 
-	var phi = [];
-	phi[-1] = -0.1;
-	phi[0] = 0;
 
 	var x = -this.x_max;
 
 	var f = this.f(E, x);
 	var f_prev = this.f(E, x-this.dx);
 	var f_next;
+
+	var phi = [];
+	phi[-1] = -0.1;
+	phi[0] = Math.exp(-Math.sqrt(f)*x);
 
 	var intg = 0;
 
@@ -393,6 +394,9 @@ graph(ctx, wave.Re, 1.5, 1, 'rgba(0, 255, 255, 0.5)');
 graph(ctx, wave.Im, 1.5, 0, 'rgba(255, 130, 255, 0.5)');
 
 }, 20);
+
+
+
 
 	</script>
 
