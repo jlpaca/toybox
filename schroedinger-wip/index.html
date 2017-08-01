@@ -5,13 +5,18 @@
 <style>
 html, body {
 	margin: 0; padding: 0;
-	background-color: #fff;
-	color: #999;
+	background-color: #fcfcfc;
+	color: #f8f;
+	text-shadow: 2px 0 #7ff;
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
 }
-h2 { font-size: 18px; }
+h2 {
+	font-size: 18px;
+	color: #f8f;
+	text-shadow: 4px 0 #7ff;
+}
 
 /*UI*/
 
@@ -27,7 +32,7 @@ h2 { font-size: 18px; }
 /* WORLD*/
 
 #canv {
-	border: 1px #ccc dashed;
+	border: none; /*1px #ccc dashed;*/
 
 	margin: 4px auto;
 
@@ -49,7 +54,7 @@ h2 { font-size: 18px; }
 <body>
 
 <div id = "container">
-	<h2>TITLE</h2>
+	<h2>QUANTUM HARMONIC OSCILLATOR</h2>
 
 	<canvas id = "canv" width = "720" height = "720"></canvas>
 	<script>
@@ -61,6 +66,7 @@ var Schroedinger = function(){
 
 	// potential function
 	this.V = function(x) {
+		//return 0;
 		return 2*x*x;
 	};
 
@@ -242,10 +248,13 @@ eigensolve: function(N){
 };
 
 // draws f, an array of values, on ctx
-function graph(ctx, f, yscale, clear){
+function graph(ctx, f, yscale, clear, style){
 	if (clear) {
 		ctx.clearRect(0, 0,
 		ctx.canvas.width, ctx.canvas.height);
+	}
+	if (style) {
+		ctx.strokeStyle = style;
 	}
 
 	var n = f.length-1;
@@ -350,11 +359,12 @@ Wave.prototype = {
 /* initialise graphics */
 var canv = document.getElementById('canv');
 var ctx = canv.getContext('2d');
+ctx.lineWidth = 8;
 
 /* solve eigenvalue problem */
 var sch = new Schroedinger();
 
-var N = 12; 
+var N = 14; 
 sch.eigensolve(N);
 
 /* check for orthogonality */
@@ -368,27 +378,28 @@ dot(sch.phi_n[i], sch.phi_n[j], sch.dx).toFixed(8));
 
 /* express initial conditions */
 var wave = new Wave(sch, function(x){
-	x = x-1.5;
+	x = 1.8*(x-1);
 	return 3*Math.exp(-x*x);
 });
 
+/* graph eigenvalues */
 //for (var i = 0; i < N; ++i) { graph(ctx, sch.phi_n[i], 1.5); }
+
 
 var t = 0; var dt = 0.01;
 window.setInterval(function(){
-	console.log('tick');
 wave.evolve(t); t += dt;
-graph(ctx, wave.Re, 1.5, 1);
-graph(ctx, wave.Im, 1.5, 0);
+graph(ctx, wave.Re, 1.5, 1, 'rgba(0, 255, 255, 0.5)');
+graph(ctx, wave.Im, 1.5, 0, 'rgba(255, 130, 255, 0.5)');
 
-}, 0);
+}, 20);
 
 	</script>
 
-	<div><p>description.</p></div>
+	<div><p>The real (cyan) and imaginary (magenta) parts of the wave function of a quantum harmonic oscillator. The time-independent Schrödinger equation is solved with a shooting method to obtain the first 14 eigenvalues, by which an initial wave function is approximated, and time evolution is applied.</p></div>
 
 	<div id = "credits">
-	J. Lok, [M] [yyyy].
+	J. Lok, August 2017.
 	</div>
 
 </div>
