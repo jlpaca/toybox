@@ -4,10 +4,12 @@ var Schroedinger = function(){
 	this.N = 2*this.x_max/this.dx;
 
 	// potential function
-	this.V = function(x) {
-		//return 0;
-		return 2.1*x*x;
+	this.V = function(x){
+		return 3*x*x;
 	};
+	this.asymptotic = function(E, x){
+		return Math.exp(-Math.sqrt(this.f(E, x))*Math.abs(x));
+	}
 
 	this.E_n = [];	// list of energy eigenvalues
 	this.phi_n = [];	// list of eigenstates
@@ -23,19 +25,21 @@ shoot: function(E){ // returns phi at the other end of the range
 
 	var x = -this.x_max;
 
-	var f = this.f(E, x);
-	var f_prev = this.f(E, x-this.dx);
-	var f_next;
+	var f, f_prev, f_next;
 
-	var phi = 0;
-	var phi_prev = -0.1;
-	var phi_next;
+	var phi, phi_prev, phi_next;
 
 	var b = this.dx*this.dx/12;
 
-	//var intg = 0;	// normalisation not needed, this
-			// function used to determine sign
-			// only.
+	var intg = 1;
+
+	x = -this.x_max;
+	f = this.f(E, x);
+	f_prev = this.f(E, x-this.dx);
+
+	phi = this.asymptotic(E, -this.x_max);
+	phi_prev = this.asymptotic(E, -this.x_max-this.dx);
+	intg = 0;
 
 	for (var i = 0; i < this.N; ++i) {
 
@@ -52,9 +56,9 @@ shoot: function(E){ // returns phi at the other end of the range
 
 		x += this.dx;
 
-		//intg += 0.5*this.dx*(phi*phi + phi_prev*phi_prev);
+		intg += 0.5*this.dx*(phi*phi + phi_prev*phi_prev);
 	}
-	//phi /= Math.sqrt(intg);
+	phi /= Math.sqrt(intg);
 
 	return phi;
 },
@@ -69,8 +73,8 @@ integrate: function(E){ // returns an array
 	var f_next;
 
 	var phi = [];
-	phi[-1] = -0.1;
-	phi[0] = 0;
+	phi[0] = this.asymptotic(E, -this.x_max);
+	phi[-1] = this.asymptotic(E, -this.x_max-this.dx);
 
 	var intg = 0;
 
@@ -98,9 +102,11 @@ integrate: function(E){ // returns an array
 },
 
 eigensolve: function(N){
+	console.log('eigensolve');
 
 	// returns [ E1, E2 ] bracketing energies
-	var eigenbracket = function(E_min, E_max, phi_target, dE){
+	var eigenbracket = function(E_min, E_max, dE){
+		var phi_target;
 		
 		var E1 = E_min;
 		var E2;
@@ -114,6 +120,8 @@ eigensolve: function(N){
 		while ((E2 = E1 + dE) <= E_max) {
 	
 			var phi2 = this.shoot(E2);
+			phi_target = this.asymptotic(E2, -this.x_max);
+
 			if ((phi1-phi_target)*(phi2-phi_target) < 0) {
 				res = [ E1, E2 ];
 				break;
@@ -128,7 +136,8 @@ eigensolve: function(N){
 	
 	// returns eigenstate energy s.t. boundary condition is
 	// satisfied to within epsilon
-	var eigenbisect = function(E_min, E_max, phi_target, epsilon){
+	var eigenbisect = function(E_min, E_max, epsilon){
+
 		var E_mid = (E_min + E_max)/2;
 		var phi_min = this.shoot(E_min);
 		var phi_mid = this.shoot(E_mid);
@@ -137,9 +146,14 @@ eigensolve: function(N){
 		var iter = 0;
 		var max_iter = 60;
 
+		var phi_target = this.asymptotic(E_mid, -this.x_max);
+
 		while (Math.abs(phi_mid - phi_target) > epsilon &&
 		iter < max_iter) {
-			if (phi_mid*phi_max < 0) {
+
+			phi_target = this.asymptotic(E_mid, -this.x_max);
+
+			if ((phi_mid-phi_target)*(phi_max-phi_target) < 0) {
 				E_min = E_mid;
 				phi_min = phi_mid;
 			} else {
@@ -165,16 +179,16 @@ eigensolve: function(N){
 	var E_start = 0;
 	var E_end = Infinity; // loop runs indefinitteelllyyy
 
-	var phi_targ = 0;
+	var phi_targ;
 
 	for (var i = 0; i < N; ++i) {
-		var bracket = eigenbracket(E_start, E_end, phi_targ, 0.01);
+		var bracket = eigenbracket(E_start, E_end, 0.01);
 		if (!bracket) {
 			console.log('failed');
 			return false;
 		}
 
-		var Ei = eigenbisect(bracket[0], bracket[1], phi_targ, 1e-6);
+		var Ei = eigenbisect(bracket[0], bracket[1], 1e-10);
 		console.log('E_' + i + ' = ' + Ei);
 
 		// add the found eigenfunction & energy to list
@@ -386,7 +400,14 @@ function start(){
 			prob = false;
 		}
 	});
-	
+
+	/*
+	for (var i = 0; i < 3; ++i) {
+		graph(ctx, sch.phi_n[i], 1.5, 0, '#999');
+	}
+	*/
+
+
 	window.setInterval(function(){
 		var wav = num?wave.evolve(state, t):wave.evolve(wave.components, t);
 		prob?
@@ -397,6 +418,7 @@ function start(){
 		t += dt;
 	
 	}, 20);
+	
 }
 
 start();
