@@ -27,7 +27,7 @@ shoot: function(E){ // returns phi at the other end of the range
 	var f_prev = this.f(E, x-this.dx);
 	var f_next;
 
-	var phi = Math.exp(Math.sqrt(f)*x);
+	var phi = 0;
 	var phi_prev = -0.1;
 	var phi_next;
 
@@ -70,7 +70,7 @@ integrate: function(E){ // returns an array
 
 	var phi = [];
 	phi[-1] = -0.1;
-	phi[0] = Math.exp(-Math.sqrt(f)*x);
+	phi[0] = 0;
 
 	var intg = 0;
 
@@ -100,7 +100,7 @@ integrate: function(E){ // returns an array
 eigensolve: function(N){
 
 	// returns [ E1, E2 ] bracketing energies
-	var eigenbracket = function(E_min, E_max, dE){
+	var eigenbracket = function(E_min, E_max, phi_target, dE){
 		
 		var E1 = E_min;
 		var E2;
@@ -114,7 +114,7 @@ eigensolve: function(N){
 		while ((E2 = E1 + dE) <= E_max) {
 	
 			var phi2 = this.shoot(E2);
-			if (phi1*phi2 < 0) {
+			if ((phi1-phi_target)*(phi2-phi_target) < 0) {
 				res = [ E1, E2 ];
 				break;
 			}
@@ -154,7 +154,7 @@ eigensolve: function(N){
 		}
 		if (Math.abs(phi_mid - phi_target) > epsilon) {
 			console.log('! bisection failed to converge (' +
-			phi_mid + ')');
+			(phi_mid - phi_target) + ')');
 		}
 
 		return E_mid;
@@ -165,14 +165,16 @@ eigensolve: function(N){
 	var E_start = 0;
 	var E_end = Infinity; // loop runs indefinitteelllyyy
 
+	var phi_targ = 0;
+
 	for (var i = 0; i < N; ++i) {
-		var bracket = eigenbracket(E_start, E_end, 0.01);
+		var bracket = eigenbracket(E_start, E_end, phi_targ, 0.01);
 		if (!bracket) {
 			console.log('failed');
 			return false;
 		}
 
-		var Ei = eigenbisect(bracket[0], bracket[1], 0, 1e-6);
+		var Ei = eigenbisect(bracket[0], bracket[1], phi_targ, 1e-6);
 		console.log('E_' + i + ' = ' + Ei);
 
 		// add the found eigenfunction & energy to list
@@ -339,6 +341,8 @@ function start(){
 		state[i] = 0;
 	}
 
+	var textdivs = document.getElementsByClassName('textdiv');
+
 	/* handlers */
 	window.addEventListener('keydown', function(e){
 		var n = parseInt(e.key);
@@ -354,6 +358,9 @@ function start(){
 		}
 		if (e.keyCode == 32) {
 			e.preventDefault();
+			for (var i = 0; i < textdivs.length; ++i) {
+				textdivs[i].classList.add('gray');
+			}
 			prob = true;
 		}
 	});
@@ -373,6 +380,9 @@ function start(){
 		}
 		if (e.keyCode == 32) {
 			e.preventDefault();
+			for (var i = 0; i < textdivs.length; ++i) {
+				textdivs[i].classList.remove('gray');
+			}
 			prob = false;
 		}
 	});
@@ -380,7 +390,7 @@ function start(){
 	window.setInterval(function(){
 		var wav = num?wave.evolve(state, t):wave.evolve(wave.components, t);
 		prob?
-		graph(ctx, wav.prob, 1.5, 1, 'rgba(160, 160, 160, 0.5)'):
+		graph(ctx, wav.prob, 1.5, 1, 'rgba(170, 170, 170, 0.5)'):
 		(graph(ctx, wav.Re, 1.5, 1, 'rgba(0, 255, 255, 0.5)'),
 		graph(ctx, wav.Im, 1.5, 0, 'rgba(255, 130, 255, 0.5)'));
 

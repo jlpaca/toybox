@@ -44,17 +44,21 @@ h2 {
 	/*overflow: hidden;*/
 }
 
+#container .gray {
+	color: #aaa;
+	text-shadow: none;
+}
 </style>
 </head>
 <body>
 
 <div id = "container">
-	<h2>QUANTUM HARMONIC OSCILLATOR</h2>
+	<h2 class="textdiv">QUANTUM HARMONIC OSCILLATOR</h2>
 
 	<canvas id = "canv" width = "720" height = "720"></canvas>
 	<script src = "schroedinger.js"></script>
 
-	<div><p>The real (cyan) and imaginary (magenta) parts of the wave function of a quantum harmonic oscillator. The time-independent Schrödinger equation is solved with a shooting method to obtain the first 16 eigenfunctions, by which an initial wave function is approximated, and time evolution is applied. The initial wave function here is <i>exp(-x<sup>2</sup>)</i>, scaled horizontally, shifted to the right, and normalised. </p>
+	<div class="textdiv"><p>The real (cyan) and imaginary (magenta) parts of the wave function of a quantum harmonic oscillator. The time-independent Schrödinger equation is solved with a shooting method to obtain the first 16 eigenfunctions, by which an initial wave function is approximated, and time evolution is applied. The initial wave function here is <i>exp(-x<sup>2</sup>)</i>, scaled horizontally, shifted to the right, and normalised. </p>
 	
 	<ul>
 		<li>0-9: display the first 10 eigenfunctions individually</li>
@@ -63,7 +67,7 @@ h2 {
 
 	</div>
 
-	<div id = "credits">
+	<div id = "credits" class="textdiv">
 	J. Lok, August 2017.
 	</div>
 
