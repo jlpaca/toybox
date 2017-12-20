@@ -51,11 +51,12 @@ h2 { font-size: 18px; }
 <script id="fragsource" type="GLSL">
 	precision highp float;
 
-	#define N 12
+	#define N_MAX 128
 	#define L 720.
-	#define THRESHOLD .01
-	uniform vec2 ballq[N];
-	uniform float ballk[N];
+	#define THRESHOLD .5 
+	uniform int N;
+	uniform vec2 ballq[N_MAX];
+	uniform float ballk[N_MAX];
 
 	float f(vec2 p, vec2 q) {
 		if (p.x - q.x > 360.) { p.x -= 720.; }
@@ -72,12 +73,14 @@ h2 { font-size: 18px; }
 
 		float t = 0.;
 		vec4 C0 = vec4(0., 0., 0., 1.);
-		vec4 C1 = vec4(1., 1., 0., 1.);
-		for (int i = 0; i < N; ++i) {
+		vec4 C1 = vec4(1., 1., 1., 1.);
+		for (int i = 0; i < N_MAX; ++i) {
+			if (i >= N) { break; }
 			t += ballk[i]*f(q.xy, ballq[i]);
 		}
 
 		gl_FragColor = (t < THRESHOLD ? C1 : C0);
+		//gl_FragColor = vec4(t, t, t, 1.);
 
 	}
 </script>
@@ -135,13 +138,16 @@ var pinfo = {
 	},
 	uniformLocation: {
 		ballq: [],
-		ballk: []
+		ballk: [],
+		N: gl.getUniformLocation(p, 'N')
 	}
 };
 gl.useProgram(pinfo.program);
 
 var N = 12;
-for (var i = 0; i < N; ++i) {
+var N_MAX = 128;
+var INTERACTIVE = true;
+for (var i = 0; i < N_MAX; ++i) {
 	pinfo.uniformLocation.ballq[i] =
 	gl.getUniformLocation(pinfo.program, 'ballq[' + i + ']');
 	
@@ -164,71 +170,20 @@ gl.vertexAttribPointer(
 	0);
 gl.enableVertexAttribArray(pinfo.attribLocation.vertq);
 
+var cursor = [ 0, 0, 0 ];
+
 var ballv = []; var dt = .2;
-var balla = [];
 var ballq = [];
 var ballk = [];
 
 for (var i = 0; i < N; ++i) {
 	ballq[i] = [ Math.random() * 720, Math.random() * 720 ];
-
-	//ballv[i] = [ Math.random() * 8 - 4, Math.random() * 8 - 4 ];
-	balla[i] = [ 0, 0 ];
-	ballv[i] = [ 0, 0 ];
-
-	ballk[i] = Math.random()*40;
-}
-
-function forces() {
-	function r2(a, b) {
-		return (a[0]-b[0])*(a[0]-b[0])+(a[1]-b[1])*(a[1]-b[1]);
-	}
-	function unit(a, b) {
-		var m = Math.sqrt(r2(a, b));
-		return [
-			(a[0]-b[0])/m,
-			(a[1]-b[1])/m
-		];
-	}
-	function magnitude(rsq, k) {
-		return 20*k/rsq;
-	}
-
-	for (var i = 0; i < N; ++i) { balla[i][0] = balla[i][1] = 0; }
-
-	for (var i = 0; i < N; ++i) {
-	for (var j = i+1; j < N; ++j) {
-		var m = magnitude(
-			r2(ballq[i], ballq[j]),
-			ballk[i]*ballk[j]);
-		var n = unit(ballq[i], ballq[j]);
-
-		balla[i][0] += m*n[0]/ballk[i];
-		balla[i][1] += m*n[1]/ballk[i];
-
-		balla[j][0] -= m*n[0]/ballk[j];
-		balla[j][1] -= m*n[1]/ballk[j];
-	}}
+	ballv[i] = [ Math.random() * 4 - 2, Math.random() * 4 - 2 ];
+	ballk[i] = Math.random()*1.2e+3;
 }
 
 function integrate() {
-	function clip(v2, a) {
-		if (v2[0] > a) { v2[0] = a; }
-		if (v2[1] > a) { v2[1] = a; }
-		if (v2[0] < -a) { v2[0] = -a; }
-		if (v2[1] < -a) { v2[1] = -a; }
-	}
-	function damp(v2, k) {
-		v2[0] *= k; v2[1] *= k;
-	}
 	for (var i = 0; i < N; ++i) {
-		// symplectic euler
-		ballv[i][0] += balla[i][0];
-		ballv[i][1] += balla[i][1];
-
-		clip(ballv[i], 10);
-		damp(ballv[i], 0.99);
-
 		ballq[i][0] += ballv[i][0];
 		ballq[i][1] += ballv[i][1];
 
@@ -239,6 +194,89 @@ function integrate() {
 	}
 }
 
+function distance2(p, q) {
+	var px = p[0]; var py = p[1];
+	var qx = q[0]; var qy = q[1];
+
+	if (px - qx > 360.) { p.x -= 720.; }
+	if (qx - px > 360.) { q.x -= 720.; }
+	if (py - qy > 360.) { p.y -= 720.; }
+	if (qy - py > 360.) { q.y -= 720.; }
+
+	return (px-qx)*(px-qx)+(py-qy)*(py-qy);
+}
+
+function U(q) {
+	var U = 0;
+	var closest = 0;
+	var tmp = Infinity;
+	var d2;
+	for (var i = 0; i < N; ++i) {
+		d2 = distance2(q, ballq[i]);
+		if (d2 < tmp) {
+			tmp = d2;
+			closest = i;
+		}
+		U += ballk[i]/d2;
+	}
+	return [U, closest];
+}
+
+function combine() {
+	function merge(i, j) {
+		// assumed i < j
+		ballk[i] = ballk[i] + ballk[j];
+		ballq[i][0] = (ballq[i][0]*ballk[j]+ballq[j][0]*ballk[i])/(ballk[i]+ballk[j]);
+		ballq[i][1] = (ballq[i][1]*ballk[j]+ballq[j][1]*ballk[i])/(ballk[i]+ballk[j]);
+
+		ballv[i][0] = (ballv[i][0]*ballk[i]+ballv[j][0]*ballk[j])/(ballk[i]+ballk[j]);
+		ballv[i][1] = (ballv[i][1]*ballk[i]+ballv[j][1]*ballk[j])/(ballk[i]+ballk[j]);
+
+		--N;
+		ballq[j] = ballq[N];
+		ballk[j] = ballk[N];
+		ballv[j] = ballv[N];
+	}
+	function sub(u, v) {
+		return [u[0]-v[0], u[1]-v[1]];
+	}
+	function dot(u, v) {
+		return u[0]*v[0]+u[1]*v[1];
+	}
+	for (var i = 0; i < N; ++i) {
+	for (var j = i+1; j < N; ++j) {
+
+		//var threshold = ballk[i]*ballk[j]*1e-2;
+		var threshold = 0.5*(ballk[i]+ballk[j]);
+		if (distance2(ballq[i], ballq[j]) < threshold &&
+		dot(
+			sub(ballq[i], ballq[j]),
+			sub(ballv[i], ballv[j])
+		) < 0
+		) {
+			merge(i, j);
+		}
+	}}
+}
+
+function split(i) {
+	if (N >= N_MAX || ballk[i] < 50) { return; }
+	ballk[i] /= 2;
+
+	var dv = [ ballv[i][1], -ballv[i][0] ];
+	var vmag = Math.sqrt(dv[1]*dv[1]+dv[0]*dv[0])/2;
+	dv[0] /= vmag; dv[1] /= vmag;
+	
+
+	ballk[N] = ballk[i];
+	ballq[N] = [ ballq[i][0], ballq[i][1] ];
+	ballv[N] = [ (ballv[i][0]-dv[0])*.9, (ballv[i][1]-dv[1])*.9 ];
+	
+	ballv[i] = [(ballv[i][0]+dv[0])*.9, (ballv[i][1]+dv[1])*.9];
+
+	++N;
+}
+
 function updateUniforms() {
 	for (var i = 0; i < N; ++i) {
 		gl.uniform2f(
@@ -247,7 +285,16 @@ function updateUniforms() {
 		gl.uniform1f(
 			pinfo.uniformLocation.ballk[i],
 			ballk[i]);
+		gl.uniform1i(
+			pinfo.uniformLocation.N,
+			N);
 	}
+}
+
+function updateCursor(e) {
+	cursor[0] = e.offsetX;
+	cursor[1] = 720-e.offsetY;
+	cursor[2] = U(cursor);
 }
 
 function render() {
@@ -257,14 +304,37 @@ function render() {
 
 function timestep() {
 
-	forces();
+	if (INTERACTIVE) { combine(); }
+
 	integrate();
 	updateUniforms();
 
 	render();
 
-window.requestAnimationFrame(timestep);
+	window.requestAnimationFrame(timestep);
 }
+
+function keydownHandler(e) {
+	console.log(e.keyCode);
+	if (e.keyCode == 32) {
+		INTERACTIVE = !INTERACTIVE;
+	}
+	if (e.keyCode == 83) {
+		console.log('SPLIT');
+		for (var i = 0; i < N; ++i) {
+			split(i);
+		}
+	}
+}
+
+canvas.addEventListener('mousemove', updateCursor);
+canvas.addEventListener('mousedown', function(e) {
+	updateCursor(e);
+	if (INTERACTIVE && (cursor[2][0] > 0.4)) {
+		split(cursor[2][1]);
+	}
+});
+window.addEventListener('keydown', keydownHandler);
 
 
 timestep();
