@@ -1,0 +1,124 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #ffffff;
+	color: #d55;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 {
+	font-size: 18px;
+	color: #55d;
+}
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+
+<script src = "../shared/three.min.js"></script>
+<script id="vertsource" type="GLSL">
+	attribute vec2 vertq;
+	void main() {
+		gl_Position = vec4(vertq, 1., 1.);
+	}
+</script>
+<script id="fragsource" type="GLSL">
+	precision highp float;
+
+	#define N_MAX 128
+	#define L 720.
+	#define THRESHOLD .5 
+	uniform int N;
+	uniform vec2 ballq[N_MAX];
+	uniform float ballk[N_MAX];
+
+	float f(vec2 p, vec2 q) {
+		if (p.x - q.x > 360.) { p.x -= 720.; }
+		if (q.x - p.x > 360.) { q.x -= 720.; }
+		if (p.y - q.y > 360.) { p.y -= 720.; }
+		if (q.y - p.y > 360.) { q.y -= 720.; }
+
+		vec2 d = p-q;
+		return 1./abs(dot(d, d));
+	}
+
+	void main() {
+		vec4 q = gl_FragCoord;
+
+		float t = 0.;
+		vec4 C0 = vec4(
+		.2+(720.-q.y)/1e+3,
+		.0,
+		.2+q.y/1e+3,
+		1.);
+		vec4 C1 = vec4(1., 1., 1., 1.);
+		//C1 = C0;
+		for (int i = 0; i < N_MAX; ++i) {
+			if (i >= N) { break; }
+			t += ballk[i]*f(q.xy, ballq[i]);
+		}
+
+		gl_FragColor = (t < THRESHOLD ? C1 : C0);
+		//gl_FragColor = vec4(t, t, t, 1.);
+
+	}
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>METABALLS</h2>
+
+	<canvas id = "world" width = "720" height = "720"></canvas>
+	<script src="metaballs.js"></script>
+	
+	<div>
+		<p>Organic-looking two-dimensional objects rendered with webGL. An inverse-square-distance potential is naïvely computed at each pixel by the fragment shader; timestepping (split/merge, integration of motion) handled in javascript.</p>
+	
+		<ul>
+			<li>LEFTCLICK: split</li>
+			<li>S KEY: explosion</li>
+			<li>SPACE: toggle interactivity</li>
+		</ul>
+	</div>
+
+	<div id = "credits">
+	J. Lok, December 2017
+	</div>
+
+</div>
+
+
+</body>
+
+</html>
