@@ -1,0 +1,286 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+
+<script src = "../shared/three.min.js"></script>
+<script id="vertsource" type="GLSL">
+	attribute vec2 vertq;
+	void main() {
+		gl_Position = vec4(vertq, 1., 1.);
+	}
+</script>
+<script id="fragsource" type="GLSL">
+	precision highp float;
+
+	#define N 12
+	#define L 720.
+	#define THRESHOLD .01
+	uniform vec2 ballq[N];
+	uniform float ballk[N];
+
+	float f(vec2 p, vec2 q) {
+		if (p.x - q.x > 360.) { p.x -= 720.; }
+		if (q.x - p.x > 360.) { q.x -= 720.; }
+		if (p.y - q.y > 360.) { p.y -= 720.; }
+		if (q.y - p.y > 360.) { q.y -= 720.; }
+
+		vec2 d = p-q;
+		return 1./abs(dot(d, d));
+	}
+
+	void main() {
+		vec4 q = gl_FragCoord;
+
+		float t = 0.;
+		vec4 C0 = vec4(0., 0., 0., 1.);
+		vec4 C1 = vec4(1., 1., 0., 1.);
+		for (int i = 0; i < N; ++i) {
+			t += ballk[i]*f(q.xy, ballq[i]);
+		}
+
+		gl_FragColor = (t < THRESHOLD ? C1 : C0);
+
+	}
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>TITLE</h2>
+
+	<canvas id = "world" width = "720" height = "720"></canvas>
+	<script>
+var canvas = document.getElementById('world');
+var gl = canvas.getContext('webgl');
+
+gl.clearColor(0, 0, 0, 1);
+
+function makeProgram(vertsource, fragsource) {
+	var vertshader = makeShader(vertsource, gl.VERTEX_SHADER);
+	var fragshader = makeShader(fragsource, gl.FRAGMENT_SHADER);
+
+	var program = gl.createProgram();
+	gl.attachShader(program, vertshader);
+	gl.attachShader(program, fragshader);
+	gl.linkProgram(program);
+
+	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+		console.log(gl.getProgramInfoLog(program));
+		return null;
+	}
+
+	return program;
+}
+
+function makeShader(source, type) {
+	var shader = gl.createShader(type);
+	gl.shaderSource(shader, source);
+	gl.compileShader(shader);
+
+	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+		console.log(gl.getShaderInfoLog(shader));
+		return null;
+		gl.deleteShader(shader);
+	}
+	return shader;
+}
+var p = makeProgram(
+	document.getElementById('vertsource').textContent,
+	document.getElementById('fragsource').textContent);
+
+var pinfo = {
+	program: p,
+	attribLocation: {
+		vertq: gl.getAttribLocation(p, 'vertq'),
+	},
+	uniformLocation: {
+		ballq: [],
+		ballk: []
+	}
+};
+gl.useProgram(pinfo.program);
+
+var N = 12;
+for (var i = 0; i < N; ++i) {
+	pinfo.uniformLocation.ballq[i] =
+	gl.getUniformLocation(pinfo.program, 'ballq[' + i + ']');
+	
+	pinfo.uniformLocation.ballk[i] =
+	gl.getUniformLocation(pinfo.program, 'ballk[' + i + ']');
+}
+
+
+var vertq = [ 1, -1, 1, 1, -1, -1, -1, 1 ];
+var vertqBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vertqBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertq), gl.STATIC_DRAW);
+
+gl.vertexAttribPointer(
+	pinfo.attribLocation.vertq,
+	2,
+	gl.FLOAT,
+	false,
+	0,
+	0);
+gl.enableVertexAttribArray(pinfo.attribLocation.vertq);
+
+var ballv = []; var dt = .2;
+var balla = [];
+var ballq = [];
+var ballk = [];
+
+for (var i = 0; i < N; ++i) {
+	ballq[i] = [ Math.random() * 720, Math.random() * 720 ];
+
+	//ballv[i] = [ Math.random() * 8 - 4, Math.random() * 8 - 4 ];
+	balla[i] = [ 0, 0 ];
+	ballv[i] = [ 0, 0 ];
+
+	ballk[i] = Math.random()*40;
+}
+
+function forces() {
+	function r2(a, b) {
+		return (a[0]-b[0])*(a[0]-b[0])+(a[1]-b[1])*(a[1]-b[1]);
+	}
+	function unit(a, b) {
+		var m = Math.sqrt(r2(a, b));
+		return [
+			(a[0]-b[0])/m,
+			(a[1]-b[1])/m
+		];
+	}
+	function magnitude(rsq, k) {
+		return 20*k/rsq;
+	}
+
+	for (var i = 0; i < N; ++i) { balla[i][0] = balla[i][1] = 0; }
+
+	for (var i = 0; i < N; ++i) {
+	for (var j = i+1; j < N; ++j) {
+		var m = magnitude(
+			r2(ballq[i], ballq[j]),
+			ballk[i]*ballk[j]);
+		var n = unit(ballq[i], ballq[j]);
+
+		balla[i][0] += m*n[0]/ballk[i];
+		balla[i][1] += m*n[1]/ballk[i];
+
+		balla[j][0] -= m*n[0]/ballk[j];
+		balla[j][1] -= m*n[1]/ballk[j];
+	}}
+}
+
+function integrate() {
+	function clip(v2, a) {
+		if (v2[0] > a) { v2[0] = a; }
+		if (v2[1] > a) { v2[1] = a; }
+		if (v2[0] < -a) { v2[0] = -a; }
+		if (v2[1] < -a) { v2[1] = -a; }
+	}
+	function damp(v2, k) {
+		v2[0] *= k; v2[1] *= k;
+	}
+	for (var i = 0; i < N; ++i) {
+		// symplectic euler
+		ballv[i][0] += balla[i][0];
+		ballv[i][1] += balla[i][1];
+
+		clip(ballv[i], 10);
+		damp(ballv[i], 0.99);
+
+		ballq[i][0] += ballv[i][0];
+		ballq[i][1] += ballv[i][1];
+
+		for (; ballq[i][0] >= 720; ballq[i][0] -= 720);
+		for (; ballq[i][0] < 0; ballq[i][0] += 720);
+		for (; ballq[i][1] >= 720; ballq[i][1] -= 720);
+		for (; ballq[i][1] < 0; ballq[i][1] += 720);
+	}
+}
+
+function updateUniforms() {
+	for (var i = 0; i < N; ++i) {
+		gl.uniform2f(
+			pinfo.uniformLocation.ballq[i],
+			ballq[i][0], ballq[i][1]);
+		gl.uniform1f(
+			pinfo.uniformLocation.ballk[i],
+			ballk[i]);
+	}
+}
+
+function render() {
+	gl.clear(gl.COLOR_BUFFER_BIT);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function timestep() {
+
+	forces();
+	integrate();
+	updateUniforms();
+
+	render();
+
+window.requestAnimationFrame(timestep);
+}
+
+
+timestep();
+	
+	
+	</script>
+	
+	<div><p>description.</p></div>
+
+	<div id = "credits">
+	J. Lok, [M] [yyyy].
+	</div>
+
+</div>
+
+
+</body>
+
+</html>
