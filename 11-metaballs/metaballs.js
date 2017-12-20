@@ -131,8 +131,8 @@ function combine() {
 	function merge(i, j) {
 		// assumed i < j
 		ballk[i] = ballk[i] + ballk[j];
-		ballq[i][0] = (ballq[i][0]*ballk[j]+ballq[j][0]*ballk[i])/(ballk[i]+ballk[j]);
-		ballq[i][1] = (ballq[i][1]*ballk[j]+ballq[j][1]*ballk[i])/(ballk[i]+ballk[j]);
+		ballq[i][0] = (ballq[i][0]*ballk[i]+ballq[j][0]*ballk[j])/(ballk[i]+ballk[j]);
+		ballq[i][1] = (ballq[i][1]*ballk[i]+ballq[j][1]*ballk[j])/(ballk[i]+ballk[j]);
 
 		ballv[i][0] = (ballv[i][0]*ballk[i]+ballv[j][0]*ballk[j])/(ballk[i]+ballk[j]);
 		ballv[i][1] = (ballv[i][1]*ballk[i]+ballv[j][1]*ballk[j])/(ballk[i]+ballk[j]);
