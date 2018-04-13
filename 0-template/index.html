@@ -24,6 +24,21 @@ h2 { font-size: 18px; }
 	font-size: 12px;
 }
 
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 512px;
+	height: 512px;
+
+	/*overflow: hidden;*/
+}
+
 </style>
 
 </head>
@@ -32,8 +47,8 @@ h2 { font-size: 18px; }
 <div id = "container">
 	<h2>TITLE</h2>
 
-	<div id = "world"></div>
-
+	<canvas id = "world" width = "512" height = "512"></canvas>
+	
 	<div><p>description.</p></div>
 
 	<div id = "credits">
