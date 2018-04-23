@@ -59,10 +59,35 @@ h2 { font-size: 18px; }
 		for (let i = 0; i < 600; ++i) {
 			S.addRandomMass();
 		}
+
+		window.addEventListener('keydown', function (e) {
+			console.log(S.steps_per_render * S.dt);
+			if (e.keyCode === 38) {
+				if (S.dt < 0.2) {
+					S.dt *= 2;
+				} else {
+					S.steps_per_render = Math.min(
+					8, S.steps_per_render*2);
+				}
+			} else if (e.keyCode === 40) {
+				if (S.steps_per_render === 1) {
+					S.dt = Math.max(0.05, S.dt/2);
+				} else {
+					S.steps_per_render /= 2;
+				}
+			}
+		});
+
+
 		S.timestep();
+
 	</script>
 	
-	<div><p>A simulation of 600 gravitationally interacting bodies, exhibiting behaviour remniscient of formation of planetary systems.	Gravitational forces calculated with the Barnes-Hut algorithm (J.Barnes, P.Hut, 1986). Spatial hashing is used for broad-phase collision detection. The camera follows the centre of mass of the system.</p></div>
+	<div><p>A simulation of 600 gravitationally interacting bodies, exhibiting behaviour remniscient of formation of planetary systems.	Gravitational forces calculated with the Barnes-Hut algorithm (J.Barnes, P.Hut, 1986). Spatial hashing is used for broad-phase collision detection. The camera follows the centre of mass of the system.</p>
+	
+	<ul>
+	<li>UP/DOWN: increase/decrease timestepping speed.</li>
+	</ul></div>
 
 	<div id = "credits">
 	J. Lok, April 2018.
