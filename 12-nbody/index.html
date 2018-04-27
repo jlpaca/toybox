@@ -40,7 +40,9 @@ h2 { font-size: 18px; }
 }
 
 </style>
-
+	<script src="spatial-hash.js"></script>
+	<script src="bhtree.js"></script>
+	<script src="nbody.js"></script>
 </head>
 <body>
 
@@ -48,42 +50,9 @@ h2 { font-size: 18px; }
 	<h2>GRAVITATIONAL N-BODY WITH COLLISIONS</h2>
 
 	<canvas id = "world" width = "720" height = "720"></canvas>
-	<script src="spatial-hash.js"></script>
-	<script src="bhtree.js"></script>
-	<script src="nbody.js"></script>
-	<script>
-		let canvas = document.getElementById("world");
-		let context = canvas.getContext("2d", { alpha: false });
-
-		let S = new Simulation(canvas, context);
-		for (let i = 0; i < 600; ++i) {
-			S.addRandomMass();
-		}
-
-		window.addEventListener('keydown', function (e) {
-			console.log(S.steps_per_render * S.dt);
-			if (e.keyCode === 38) {
-				if (S.dt < 0.2) {
-					S.dt *= 2;
-				} else {
-					S.steps_per_render = Math.min(
-					8, S.steps_per_render*2);
-				}
-			} else if (e.keyCode === 40) {
-				if (S.steps_per_render === 1) {
-					S.dt = Math.max(0.05, S.dt/2);
-				} else {
-					S.steps_per_render /= 2;
-				}
-			}
-		});
-
-
-		S.timestep();
-
-	</script>
+	<script src="init.js"></script>
 	
-	<div><p>A simulation of 600 gravitationally interacting bodies, exhibiting behaviour remniscient of formation of planetary systems.	Gravitational forces calculated with the Barnes-Hut algorithm (J.Barnes, P.Hut, 1986). Spatial hashing is used for broad-phase collision detection. The camera follows the centre of mass of the system.</p>
+	<div><p>A simulation of 600 gravitationally interacting bodies, exhibiting behaviour resembling the formation of planetary systems.	Gravitational forces calculated with the Barnes-Hut algorithm (J.Barnes, P.Hut, 1986). Spatial hashing is used for broad-phase collision detection. The camera follows the centre of mass of the system.</p>
 	
 	<ul>
 	<li>UP/DOWN: increase/decrease timestepping speed.</li>

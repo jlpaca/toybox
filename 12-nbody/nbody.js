@@ -12,7 +12,7 @@ function Simulation (canv, ctx)
 	this.L = Math.max(this.W, this.H);
 
 	this.G = 0.4;
-	this.dt = 0.2;
+	this.dt = 0.08;
 	this.theta2 = 0.4;
 	this.merge_threshold = 4;
 
@@ -47,6 +47,7 @@ Simulation.prototype.forces = function ()
 		ry = bhn.y - mi.y;
 
 		scale = G*bhn.m/(Math.pow((rx*rx+ry*ry+0.1), 1.5) + 1e6);
+		//scale = G*bhn.m/Math.max(Math.pow((rx*rx+ry*ry+0.1), 1.5), 1e6);
 
 		mi.ax += scale*rx;
 		mi.ay += scale*ry;
