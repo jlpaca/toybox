@@ -5,8 +5,8 @@
 <style>
 html, body {
 	margin: 0; padding: 0;
-	background-color: #000;
-	color: #999;
+	background-color: #0a0030;
+	color: #78a;
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
@@ -73,7 +73,7 @@ vec2 f (vec2 z, vec2 c)
 	return mul(z, z)+c;
 }
 
-const float scale = 1.5;
+const float scale = 2.;
 
 void main ()
 {
@@ -100,6 +100,7 @@ void main ()
 </script>
 
 <script id = "fsh-J" type = "text/GLSL">
+#define M_PI = 3.1415926536
 precision mediump float;
 
 varying vec2 tex_x;
@@ -114,16 +115,29 @@ vec2 mul (vec2 z1, vec2 z2)
 
 const float scale = 2.;
 
+/* colour from parameter in [0, 1] */
+const vec4 col_A = vec4(0.2, 0.0, 0.3, 1.0); // purple
+const vec4 col_B = vec4(1.0, 0.3, 0.2, 1.0); // orange
+vec4 palette(float h)
+{
+	float w = h/100.;
+	vec4 W = vec4(-.05, w, w, 1.);
+
+	float q = min(1., h/10.);
+	vec4 C = (cos(q)*col_A + sin(q)*col_B)*0.8;
+	return W + C;
+}
+
 void main ()
 {
 	vec2 z = tex_x*scale;
 
 	vec4 frag_color;
 
-	int iter = 0;
-	const int max_iter = 1000;
+	const int max_iter = 512;
+	int iter = max_iter;
 
-	float cutoff = 2.;
+	float cutoff = 5.;
 
 	for (int i = 0; i < max_iter; ++i) {
 
@@ -135,10 +149,8 @@ void main ()
 		}
 	}
 
-	float h = float(iter)/16.;
-	frag_color = vec4(h, h, h, 1.);
-
-	gl_FragColor = frag_color;
+	float h = float(iter);
+	gl_FragColor = palette(h);
 }
 </script>
 </head>
@@ -214,7 +226,8 @@ void main ()
 			gl.vertexAttribPointer(x_locJ, 2, gl.FLOAT, false, 0, 0);
 
 			const c_locJ = gl.getUniformLocation(prgJ, "c");
-			gl.uniform2f(c_locJ, 0.2, 0.2);
+			gl.uniform2f(c_locJ, -0.21, -0.66);
+			//gl.uniform2f(c_locJ, -0.214, -0.67);
 
 			/* for Mandelbrot */
 			gl.useProgram(prgM);
@@ -260,21 +273,23 @@ void main ()
 		const scale = 2.0;
 
 
-		const deactivate = function (e) {
+		const deactivate = function () {
 			active = 0;
 			state.gl.useProgram(state.prg.M);
 			render(state);
+
+			console.log(cx + ' + ' + cy + 'i');
 		}
 
-		const activate = function (e) {
+		const activate = function () {
 			active = 1;
 			state.gl.useProgram(state.prg.J);
 			render(state);
 		}
 
 		const canv = document.getElementById('world');
-		window.addEventListener('keyup', activate);
-		window.addEventListener('keydown', deactivate);
+		window.addEventListener('mouseup', activate);
+		window.addEventListener('mousedown', deactivate);
 
 		window.addEventListener('mousemove', function (e) {
 			if (!active) { return; }
@@ -284,13 +299,13 @@ void main ()
 			const y = e.clientY - rect.top;
 
 			cx = 2*x/canv.width-1;
+			cx = cx*scale-offsetx;
+
 			cy = -2*y/canv.width+1;
+			cy = cy*scale-offsety;
 
 			state.gl.useProgram(state.prg.J);
-			state.gl.uniform2f(
-				state.u_loc.J.c,
-				cx*scale-offsetx,
-				cy*scale-offsety);
+			state.gl.uniform2f(state.u_loc.J.c, cx, cy);
 			render(state);
 		});
 
