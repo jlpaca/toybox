@@ -3,10 +3,10 @@
 <head>
 <link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
 <style>
-html, body {
+body {
 	margin: 0; padding: 0;
 	background-color: #0a0030;
-	color: #78a;
+	color: #637;
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
@@ -22,6 +22,11 @@ h2 { font-size: 18px; }
 #credits{
 	margin-top: 16px;
 	font-size: 12px;
+}
+
+.shifted {
+	background-color: #180038;
+	color: #758;
 }
 
 /* WORLD*/
@@ -75,6 +80,17 @@ vec2 f (vec2 z, vec2 c)
 
 const float scale = 2.;
 
+/* colour from parameter in [0, 1] */
+const vec4 col_A = vec4(0.2, 0.0, 0.3, 1.0); // purple
+const vec4 col_B = vec4(1.0, 0.3, 0.2, 1.0); // orange
+vec4 palette(float h)
+{
+	float w = h/100.;
+	float q = min(1., h/10.);
+	return vec4(-.05, w, w, 1.) +
+	(cos(q)*col_A + sin(q)*col_B)*0.8;
+}
+
 void main ()
 {
 	vec2 c = tex_x*scale-offset;
@@ -82,20 +98,21 @@ void main ()
 
 	vec4 frag_color;
 
-	int iter = 100;
-	float cutoff = 2.;
+	const int max_iter = 512;
+	int iter = max_iter;
+
+	float cutoff = 5.;
 
 	for (int i = 0; i < 100; ++i) {
-		z = f(z, c);
+		z = mul(z, z) + c;
+
+		if (length(z) > cutoff) {
+			iter = i;
+			break;
+		}
 	}
 
-	if (length(z) > cutoff) {
-		frag_color = vec4(0., 0., 0., 1);
-	} else {
-		frag_color = vec4(1., 1., 1., 1);
-	}
-
-	gl_FragColor = frag_color;
+	gl_FragColor = palette(float(iter));
 }
 </script>
 
@@ -121,11 +138,9 @@ const vec4 col_B = vec4(1.0, 0.3, 0.2, 1.0); // orange
 vec4 palette(float h)
 {
 	float w = h/100.;
-	vec4 W = vec4(-.05, w, w, 1.);
-
 	float q = min(1., h/10.);
-	vec4 C = (cos(q)*col_A + sin(q)*col_B)*0.8;
-	return W + C;
+	return vec4(-.05, w, w, 1.) +
+	(cos(q)*col_A + sin(q)*col_B)*0.8;
 }
 
 void main ()
@@ -157,7 +172,7 @@ void main ()
 <body>
 
 <div id = "container">
-	<h2>TITLE</h2>
+	<h2>JULIA SETS</h2>
 
 	<canvas id = "world" width = "720" height = "720"></canvas>
 	<script>
@@ -278,6 +293,10 @@ void main ()
 			state.gl.useProgram(state.prg.M);
 			render(state);
 
+
+			/* change style, last minute hacky thing */
+			document.body.className = "shifted";
+
 			console.log(cx + ' + ' + cy + 'i');
 		}
 
@@ -285,6 +304,8 @@ void main ()
 			active = 1;
 			state.gl.useProgram(state.prg.J);
 			render(state);
+
+			document.body.className = "";
 		}
 
 		const canv = document.getElementById('world');
@@ -311,10 +332,10 @@ void main ()
 
 	</script>
 	
-	<div><p>description.</p></div>
+	<div><p>Rendering of Julia sets of the family of complex quadratic polynomials <i>f<sub>c</sub>(z) = z<sup>2</sup> + c</i>, coloured by rate of convergence. The parameter <i>c</i> is computed from the location of the cursor in the window; click or hold to show the the Mandelbrot set rendered on the corresponding complex plane.</p></div>
 
 	<div id = "credits">
-	J. Lok, [M] [yyyy].
+	J. Lok, April 2018.
 	</div>
 
 </div>
