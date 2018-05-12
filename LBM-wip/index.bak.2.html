@@ -1,0 +1,453 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 512px;
+	height: 512px;
+
+	image-rendering: pixelated;
+	/*overflow: hidden;*/
+}
+
+</style>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>TITLE</h2>
+
+	<canvas id = "world" width = "512" height = "512"></canvas>
+
+	<script id = "vsh" type = "text/GLSL">#version 300 es
+	precision mediump float;
+
+	in vec2 vert_x;
+
+	void main ()
+	{
+		gl_Position = vec4(vert_x, 0., 1.);
+	}
+	</script>
+
+	<script id = "fsh" type = "text/GLSL">#version 300 es
+	precision mediump float;
+
+	uniform sampler2D tex;
+
+	out vec4 frag_color;
+
+	vec4 texel(sampler2D tx, ivec2 frag) {
+		return texture(tx, vec2(frag)/512.);
+	}
+
+	ivec2 frag_to_lab (ivec2 frag) {
+		return frag/2;
+	}
+	ivec2 lab_to_frag (ivec2 lab, int celltype) {
+		return lab*2+ivec2((celltype&2)/2, celltype&1);
+	}
+
+	float f (int component, ivec2 lab) {
+		return texel(
+			tex,
+			lab_to_frag(
+				lab,
+				component%3
+			))[component/3];
+	}
+
+	void main ()
+	{
+		ivec2 frag = ivec2(gl_FragCoord.xy);
+		//frag_color += texel(tex, frag);
+		ivec2 lab = frag_to_lab(frag);
+
+		int celltype = 2*(frag.x&1) + (frag.y&1);
+
+		/* streaming step */
+		float a[9] = float[9](
+			0., 0., 0., 0., 0., 0., 0., .5, 0.);
+
+
+		frag_color = vec4(a[0], a[7], a[8], 1.);
+		frag_color += texel(tex, frag);
+		frag_color.a = 1.;
+	}
+	</script>
+
+	<script>
+
+		const GL = function (canv)
+		{
+			this.canv = canv;
+			this.gl = canv.getContext("webgl2");
+
+			if (!this.gl) {
+				throw "error: webgl context not supported.";
+			}
+			let ext = this.gl.getExtension("EXT_color_buffer_float");
+
+			if (!ext) {
+				throw "error: floating point color buffer not supported.";
+			}
+
+			this.sh = {};
+			this.prg = {};
+
+			this.tex = {};
+			this.fb = {};
+		}
+
+		GL.prototype.makeShader = function (id, src, type)
+		{
+			const gl = this.gl;
+			
+			const sh = gl.createShader(type);
+			gl.shaderSource(sh, src);
+			gl.compileShader(sh);
+
+			if (gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+				this.sh[id] = sh;
+				return sh;
+			}
+			console.log(gl.getShaderInfoLog(sh));
+			gl.deleteShader(sh);
+
+			throw "error: failed to compile shader.";
+		}
+
+		GL.prototype.makeProgram = function (id, vsh, fsh)
+		{
+			const gl = this.gl;
+
+			const prog = gl.createProgram();
+			gl.attachShader(prog, vsh);
+			gl.attachShader(prog, fsh);
+			gl.linkProgram(prog);
+
+			if (gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+
+				this.prg[id] = {
+					prog: prog,
+					unif: {},
+					samp: [],
+					atrb: {},
+					verts: {
+						count: 0,
+						type: gl.TRIANGLES,
+					}
+				};
+
+				const prg = this.prg[id];
+				prg.makeUniform = function (name, type) {
+					gl.makeUniform(prg, name, type); };
+				prg.setUniform = function (name, val) {
+					gl.setUniform(prg, name, val); };
+
+				return this.prg[id];
+			}
+
+			console.log(gl.getProgramInfoLog(prog));
+			gl.deleteProgram(prog);
+			throw "error: failed to link program.";
+		}
+
+		GL.prototype.makeUniform = function (prg, name, type)
+		{
+			const gl = this.gl;
+				
+			const loc = gl.getUniformLocation(prg.prog, name);
+			if (loc === null) {
+				throw "error: uniform " + name + " not found.";
+			}
+
+			prg.unif[name] = {
+				loc: loc,
+				type: type
+			}
+
+			return prg.unif[name];
+		}
+
+		GL.prototype.setUniform = function (prg, name, val)
+		{
+			const gl = this.gl;
+			gl.useProgram(prg.prog);
+
+			const u = prg.unif[name];
+			if (u === undefined) {
+				throw "error: " + name + " not a known uniform.";
+			}
+			gl["uniform" + u.type](u.loc, val);
+		}
+
+		GL.prototype.makeSampler = function (prg, name)
+		{
+			const gl = this.gl;
+			if (gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS)
+				< prg.samp.length+2) {
+				throw "error: too many samplers.";
+			}
+
+			this.makeUniform(prg, name, "1i");
+			prg.samp[name] = null;
+		}
+		GL.prototype.setSampler = function (prg, name, tex_name)
+		{
+			const s = prg.samp[name];
+			if (s === undefined) {
+				throw "error: " + name + " not a known sampler.";
+			}
+
+			prg.samp[name] = tex_name;
+		}
+
+		GL.prototype.assignSamplers = function (prg)
+		{
+			/* binds textures to units and points samplers to the
+			 * correct units. */
+			const gl = this.gl;
+			
+			let i = 1;
+			for (let s in prg.samp) {
+				const tex = this.tex[prg.samp[s]];
+
+				gl.activeTexture(gl["TEXTURE" + i]);
+				gl.bindTexture(gl.TEXTURE_2D, tex);
+
+				this.setUniform(prg, s, i);
+				++i;
+			}
+
+		}
+
+		GL.prototype.makeAttributeBuffer = function (prg, name, size, type, mode)
+		{
+			const gl = this.gl;
+			
+			const loc = gl.getAttribLocation(prg.prog, name);
+			if (loc === null) {
+				throw "error: attribute " + name + " not found.";
+			}
+
+			const buf = gl.createBuffer();
+			gl.enableVertexAttribArray(loc);
+
+			prg.atrb[name] = {
+				loc: loc,
+				type: type,
+				mode: mode || gl.STATIC_DRAW,
+				buf: buf,
+				size: size,
+			}
+		}
+
+		GL.prototype.setAttributeBuffer = function (prg, name, val)
+		{
+			const gl = this.gl;
+			const a = prg.atrb[name];
+			if (a === undefined) {
+				throw "error: " + name + " not a know attribute.";
+			}
+
+			const vcount = val.length/a.size;
+			if (!prg.verts.count) {
+				prg.verts.count = vcount;
+			}
+			if (vcount !== prg.verts.count) {
+				console.warn("buffer data for different attributes " +
+				"have inconsistent vertex counts.");
+			}
+
+			//gl.useProgram(prg.prog);
+			gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
+			gl.vertexAttribPointer(a.loc, a.size, a.type, false, 0, 0);
+			gl.bufferData(gl.ARRAY_BUFFER, val, a.mode);
+
+		}
+
+
+		GL.prototype.makeTexture = function (name)
+		{
+			const gl = this.gl;
+			const tex = gl.createTexture();
+
+			gl.activeTexture(gl.TEXTURE0);
+			gl.bindTexture(gl.TEXTURE_2D, tex);
+
+			this.tex[name] = tex;
+		}
+
+		GL.prototype.setTexture = function (name, data, size, i_format, format, type)
+		{
+			const gl = this.gl;
+			const tex = this.tex[name];
+			if (tex === undefined) {
+				throw "error: " + name + " not a known texture object.";
+			}
+
+			gl.activeTexture(gl.TEXTURE0);
+			gl.bindTexture(gl.TEXTURE_2D, tex);
+
+			gl.texImage2D(gl.TEXTURE_2D, 0, i_format, size, size,
+				0, format, type, data);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+		}
+
+		GL.prototype.makeFramebuffer = function (name, size, i_format, format, type)
+		{
+			const gl = this.gl;
+			const fb = gl.createFramebuffer();
+
+			const texname = "_tex-" + name;
+			this.makeTexture(texname);
+			this.setTexture(texname, null, size, i_format, format, type);
+
+			this.fb[name] = {
+				fbuf: fb,
+				tex: this.tex[texname]
+			};
+		}
+
+		GL.prototype.render = function (prg, type, target)
+		{
+			const gl = this.gl;
+
+			target = target || null;
+			gl.bindFramebuffer(gl.FRAMEBUFFER, target);
+
+			if (type) {
+				prg.verts.type = type;
+			}
+
+			this.assignSamplers(prg);
+
+			gl.useProgram(prg.prog);
+			gl.drawArrays(type, 0, prg.verts.count);
+		}
+
+		GL.prototype.renderToFramebuffer = function (prg, type, fb)
+		{
+			const gl = this.gl;
+
+			gl.bindFramebuffer(gl.FRAMEBUFFER, fb.fbuf);
+
+			//gl.activeTexture(gl.TEXTURE0);
+			//gl.bindTexture(gl.TEXTURE_2D, fb.tex);
+
+			gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+				gl.TEXTURE_2D, fb.tex, 0);
+
+			g.render(prg, type, fb.fbuf);
+
+			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		}
+
+		var g = new GL(document.getElementById("world"));
+		g.makeShader("v", document.getElementById("vsh").text, g.gl.VERTEX_SHADER);
+		g.makeShader("f", document.getElementById("fsh").text, g.gl.FRAGMENT_SHADER);
+		g.makeProgram("p", g.sh.v, g.sh.f);
+
+		/* set up time uniform
+		g.makeUniform(g.prg.p, "time", "1f");
+		g.setUniform(g.prg.p, "time", 1);
+		*/
+
+		/* set up vertex buffer */
+		const vert_x = new Float32Array([ 1, 1, -1, 1, 1, -1, -1, -1 ]);
+		g.makeAttributeBuffer(g.prg.p, "vert_x", 2, g.gl.FLOAT);
+		g.setAttributeBuffer(g.prg.p, "vert_x", vert_x);
+
+		/* set up textures */
+		const w_width = 512;
+		const tex_A = new Float32Array(w_width*w_width*4);
+		for (let i = 0; i < w_width; ++i) {
+		for (let j = 0; j < w_width; ++j) {
+			tex_A[(j+w_width*i)*4  ] = 0;//i%2 ? 1 : 0;
+			tex_A[(j+w_width*i)*4+1] = 0;//j%2 ? 1 : 0;
+			tex_A[(j+w_width*i)*4+2] = 0;//j%2 ? 0 : 1;
+			tex_A[(j+w_width*i)*4+3] = 1;
+		}}
+
+		g.makeTexture("tex_A");
+		g.setTexture("tex_A", tex_A, w_width, g.gl.RGBA32F, g.gl.RGBA, g.gl.FLOAT);
+
+		g.makeSampler(g.prg.p, "tex", "1i");
+		g.setSampler(g.prg.p, "tex", "tex_A");
+
+		g.gl.activeTexture(g.gl.TEXTURE1);
+		g.gl.bindTexture(g.gl.TEXTURE_2D, g.tex["tex_A"]);
+
+		/* set up framebuffers */
+		g.makeFramebuffer("fb_A", w_width, g.gl.RGBA32F, g.gl.RGBA, g.gl.FLOAT);
+		g.makeFramebuffer("fb_B", w_width, g.gl.RGBA32F, g.gl.RGBA, g.gl.FLOAT);
+
+		/* render first timestep into fb_A */
+		g.renderToFramebuffer(g.prg.p, g.gl.TRIANGLE_STRIP, g.fb["fb_A"]);
+		g.render(g.prg.p, g.gl.TRIANGLE_STRIP);
+
+		function timestep ()
+		{
+			g.setSampler(g.prg.p, "tex", "_tex-fb_A");
+			g.renderToFramebuffer(g.prg.p, g.gl.TRIANGLE_STRIP, g.fb["fb_B"]);
+
+			g.setSampler(g.prg.p, "tex", "_tex-fb_B");
+			g.renderToFramebuffer(g.prg.p, g.gl.TRIANGLE_STRIP, g.fb["fb_A"]);
+
+			g.render(g.prg.p, g.gl.TRIANGLE_STRIP);
+
+		}
+
+		//timestep();
+
+
+
+	</script>
+	
+	<div><p>description.</p></div>
+
+	<div id = "credits">
+	J. Lok, [M] [yyyy].
+	</div>
+
+</div>
+
+
+</body>
+
+</html>
