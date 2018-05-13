@@ -6,7 +6,7 @@
 html, body {
 	margin: 0; padding: 0;
 	background-color: #fff;
-	color: #6cf;
+	color: #0af;
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
@@ -36,8 +36,8 @@ h2 {
 
 	position: relative;
 
-	width: 512px;
-	height: 512px;
+	width: 720px;
+	height: 720px;
 
 	image-rendering: pixelated;
 	/*overflow: hidden;*/
@@ -49,7 +49,7 @@ h2 {
 <body>
 
 <div id = "container">
-	<h2>TITLE</h2>
+	<h2>LATTICE BOLTZMANN, IN PARALLEL</h2>
 
 	<canvas id = "world" width = "512" height = "512"></canvas>
 
@@ -68,6 +68,9 @@ h2 {
 	precision mediump float;
 
 	uniform sampler2D tex;
+
+	uniform vec2 cursor;
+	uniform float radius;
 
 	out vec4 frag_color;
 
@@ -112,7 +115,8 @@ h2 {
 
 	bool boundary (ivec2 lab) {
 		//return distance(vec2(lab), vec2(60, 128)) < 12.;
-		return abs(lab.x-50) < 6 && abs(lab.y - 128) < 18;
+		return abs(lab.x-50) < 6 && abs(lab.y - 128) < 18 ||
+		distance(vec2(lab), cursor) < radius;
 	}
 
 	void main ()
@@ -136,7 +140,8 @@ h2 {
 				f_prev(i, lab - ivec2(e[i])),
 				f_prev(inv[i], lab),
 				boundary(lab-ivec2(e[i])));
-			f[i] *= (1. - float(boundary(lab)));
+
+			f[i] = mix(f[i], w[i], float(boundary(lab)));
 		}
 
 		/* equilibium */
@@ -151,9 +156,12 @@ h2 {
 		f[9] = rho; f[10] = u.x; f[11] = u.y;
 
 		/* relaxation */
-		float omega = 1.9;
+		float omega = 1.8;
 		for (int i = 0; i < 9; ++i) {
 			f[i] = f[i] * (1.0 - omega) + omega * f_equi(i, rho, u);
+
+			/* hide your instabilities */
+			f[i] = mix(f[i], w[i], float(f[i] < 0.));
 		}
 
 		/* sources and stuff */
@@ -163,21 +171,20 @@ h2 {
 		}}
 
 		/* write results; don't care about celltype 3 */
-		if (celltype == 3) {
-			frag_color = vec4(0, u.x*4., u.y*4., 1);
-		} else {
 		frag_color = vec4(
 			f[celltype%4],
 			f[celltype%4+3],
 			f[celltype%4+6],
 			f[celltype%4+9]);
-		}
 	}
 	</script>
 	<script id = "fsh-img", type = "text/GLSL">#version 300 es
 		precision mediump float;
 
 		uniform sampler2D tex;
+
+		uniform vec2 cursor;
+		uniform float radius;
 
 		out vec4 frag_color;
 
@@ -204,18 +211,22 @@ h2 {
 		float vort (ivec2 lab) {
 			/* vorticity by central difference */
 			return (0.5*(f(11, lab+ivec2(1, 0))-f(11, lab-ivec2(1, 0))) -
-			0.5*(f(10, lab+ivec2(0, 1))-f(10, lab-ivec2(0, 1)))) *
-			float(lab.x != 0) * float(lab.x != 255);
+			0.5*(f(10, lab+ivec2(0, 1))-f(10, lab-ivec2(0, 1))));
 		}
 
 		vec4 scale (float s) {
 			/* NaN - respecting clamp */
-			s = 1.0 * float(s >= 1.) +
-			(-1.0) * float(s <= -1.) +
-			s*float((s <= 1.) && (s >= -1.));
+			s = 2.0 * float(s > 2.) +
+			(-2.0) * float(s < -2.) +
+			s*float((s < 2.) && (s > -2.));
 
 			float c = sin(s);
 			return vec4(1.-c, 1.-0.2*abs(c), 1.+c, 1.);
+		}
+
+		bool boundary (ivec2 lab) {
+			return abs(lab.x-50) < 4 && abs(lab.y - 128) < 16 ||
+			distance(vec2(lab), cursor) < radius-2.;
 		}
 
 		void main()
@@ -225,7 +236,14 @@ h2 {
 			float rho = 3.*(f(9, lab)-1.);
 			float v = vort(lab)*30.;
 
-			frag_color = scale(v);
+			/* grey if part of obstable, white if border (vorticity
+			 * data doesn't make sense there), colour by vorticity
+			 * otherwise. */
+			bool b = boundary(lab);
+			frag_color = mix(
+				scale(v),
+				vec4(1., 1., 1., 1.) - float(b)*vec4(0.1, 0.1, 0.1, 0.0),
+				float((lab.x == 0) || (lab.x == 255) || b));
 		}
 	</script>
 
@@ -279,6 +297,40 @@ h2 {
 		g.makeTexture("tex_A");
 		g.setTexture("tex_A", tex_A, w_width, g.gl.RGBA32F, g.gl.RGBA, g.gl.FLOAT);
 
+		/* interaction */
+		let interact = 0;
+		let cursor = [ 120, 120 ];
+		let radius = 10;
+
+		g.makeUniform(g.prg.psim, "cursor", "2fv");
+		g.setUniform(g.prg.psim, "cursor", new Float32Array(cursor));
+
+		g.makeUniform(g.prg.psim, "radius", "1f");
+		g.setUniform(g.prg.psim, "radius", radius);
+
+		g.makeUniform(g.prg.pimg, "cursor", "2fv");
+		g.setUniform(g.prg.pimg, "cursor", new Float32Array(cursor));
+
+		g.makeUniform(g.prg.pimg, "radius", "1f");
+		g.setUniform(g.prg.pimg, "radius", radius);
+
+		window.addEventListener('wheel', function (e) {
+			if (e.deltaY < 0) {
+				radius = Math.min(40, radius + 1);
+			} else {
+				radius = Math.max(3, radius - 1);
+			}
+		});
+		window.addEventListener('mousedown',	function (e) { interact = 1;  });
+		window.addEventListener('mouseup',		function (e) { interact = 0; });
+
+		window.addEventListener('mousemove', function (e) {
+			let rect = g.canv.getBoundingClientRect();
+			cursor[0] = (e.clientX - rect.left) * 256 / 720;
+			cursor[1] = (720 - (e.clientY - rect.top)) * 256 / 720;
+		});
+
+
 		g.makeSampler(g.prg.psim, "tex");
 		g.setSampler(g.prg.psim, "tex", "tex_A");
 
@@ -299,7 +351,12 @@ h2 {
 		let t = 0; let prev_t = 0;
 		function timestep (t)
 		{
-			//console.log(t - prev_t); prev_t = t;
+			if (interact) {
+			g.setUniform(g.prg.psim, "cursor", new Float32Array(cursor));
+			g.setUniform(g.prg.pimg, "cursor", new Float32Array(cursor));
+			}
+			g.setUniform(g.prg.psim, "radius", radius*interact);
+			g.setUniform(g.prg.pimg, "radius", radius*interact);
 
 			for (let i = 0; i < 4; ++i) {
 				g.setSampler(g.prg.psim, "tex", "_tex-fb_A");
@@ -321,7 +378,10 @@ h2 {
 
 	</script>
 	
-	<div><p>D2Q9 Lattice Gas Boltzmann simulation exhibiting vortex shedding. Timestepping is done in a GLSL fragment shader, in which all cells are updated in parallel.</p></div>
+	<div><p>D2Q9 Lattice Gas Boltzmann simulation exhibiting vortex shedding. Timestepping is done in a GLSL fragment shader, in which all cells are updated in parallel. The flow field, 256 by 256 grid cells in dimension, is coloured by vorticity.</p>
+
+	<p>Interact with the simulation by holding down a mouse button, moving the cursor, and scrolling.</p>
+	</div>
 
 	<div id = "credits">
 	J. Lok, May 2018.
