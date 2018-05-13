@@ -5,13 +5,16 @@
 <style>
 html, body {
 	margin: 0; padding: 0;
-	background-color: #000;
-	color: #999;
+	background-color: #fff;
+	color: #6cf;
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
 }
-h2 { font-size: 18px; }
+h2 {
+	font-size: 18px;
+	color: #fc6;
+}
 
 /*UI*/
 
@@ -109,7 +112,7 @@ h2 { font-size: 18px; }
 
 	bool boundary (ivec2 lab) {
 		//return distance(vec2(lab), vec2(60, 128)) < 12.;
-		return abs(lab.x-60) < 6 && abs(lab.y - 128) < 18;
+		return abs(lab.x-50) < 6 && abs(lab.y - 128) < 18;
 	}
 
 	void main ()
@@ -178,7 +181,6 @@ h2 { font-size: 18px; }
 
 		out vec4 frag_color;
 
-
 		vec4 texel(sampler2D tx, ivec2 frag) {
 			return texture(tx, vec2(frag)/512.);
 		}
@@ -201,34 +203,29 @@ h2 { font-size: 18px; }
 
 		float vort (ivec2 lab) {
 			/* vorticity by central difference */
-			return 0.5*(f(11, lab+ivec2(1, 0))-f(11, lab-ivec2(1, 0))) -
-			0.5*(f(10, lab+ivec2(0, 1))-f(10, lab-ivec2(0, 1)));
+			return (0.5*(f(11, lab+ivec2(1, 0))-f(11, lab-ivec2(1, 0))) -
+			0.5*(f(10, lab+ivec2(0, 1))-f(10, lab-ivec2(0, 1)))) *
+			float(lab.x != 0) * float(lab.x != 255);
 		}
 
-		float umag (ivec2 lab) {
-			return length(vec2(f(10, lab), f(11, lab)));
-		}
+		vec4 scale (float s) {
+			/* NaN - respecting clamp */
+			s = 1.0 * float(s >= 1.) +
+			(-1.0) * float(s <= -1.) +
+			s*float((s <= 1.) && (s >= -1.));
 
-		/* colour space conversion */
-		vec3 hsv2rgb(vec3 c) {
-		  vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-		  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-		  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-		}
-
-		vec4 palette (float s) {
-			return vec4(abs(s), abs(s), abs(s), 1.);
+			float c = sin(s);
+			return vec4(1.-c, 1.-0.2*abs(c), 1.+c, 1.);
 		}
 
 		void main()
 		{
 			ivec2 lab = frag_to_lab(ivec2(gl_FragCoord.xy));
 
-			//frag_color = texture(tex, gl_FragCoord.xy/512.);
-			float rho = f(9, lab);
-			float v = vort(lab);
+			float rho = 3.*(f(9, lab)-1.);
+			float v = vort(lab)*30.;
 
-			frag_color = palette(v*20.);
+			frag_color = scale(v);
 		}
 	</script>
 
@@ -324,10 +321,10 @@ h2 { font-size: 18px; }
 
 	</script>
 	
-	<div><p>description.</p></div>
+	<div><p>D2Q9 Lattice Gas Boltzmann simulation exhibiting vortex shedding. Timestepping is done in a GLSL fragment shader, in which all cells are updated in parallel.</p></div>
 
 	<div id = "credits">
-	J. Lok, [M] [yyyy].
+	J. Lok, May 2018.
 	</div>
 
 </div>
