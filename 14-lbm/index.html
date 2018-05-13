@@ -49,7 +49,7 @@ h2 {
 <body>
 
 <div id = "container">
-	<h2>LATTICE BOLTZMANN, IN PARALLEL</h2>
+	<h2>PARALELL LATTICE BOLTZMANN</h2>
 
 	<canvas id = "world" width = "512" height = "512"></canvas>
 
@@ -216,12 +216,13 @@ h2 {
 
 		vec4 scale (float s) {
 			/* NaN - respecting clamp */
-			s = 2.0 * float(s > 2.) +
-			(-2.0) * float(s < -2.) +
-			s*float((s < 2.) && (s > -2.));
+			float c = 1.0 * float(s > 1.) +
+			(-1.0) * float(s < -1.) +
+			s*float((s < 1.) && (s > -1.));
 
-			float c = sin(s);
-			return vec4(1.-c, 1.-0.2*abs(c), 1.+c, 1.);
+			float k = -0.2*max(abs(s)-1., 0.);
+
+			return vec4(1.-c+k, 1.-0.2*abs(c)+k, 1.+c+k, 1.);
 		}
 
 		bool boundary (ivec2 lab) {
