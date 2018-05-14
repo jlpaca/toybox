@@ -164,8 +164,8 @@ var Pool = function(L, dt, damping, temp){
 	this.canv.width = this.canv.height = this.L;
 	this.ctx = this.canv.getContext('2d');
 
-	this.ctx.strokeStyle = "#ffbbbb";
-	this.ctx.fillStyle = "#ff6666";
+	this.ctx.strokeStyle = "#ffe0e0";
+	this.ctx.fillStyle = "#ff5c5c";
 
 	this.cursor = new Cursor(this.canv);
 
