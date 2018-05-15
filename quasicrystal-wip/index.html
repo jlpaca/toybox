@@ -1,0 +1,134 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #000;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+
+<script id="vsh" type="text/glsl">#version 300 es
+in vec2 x;
+void main() {
+	gl_Position = vec4(x, 0., 1.); }
+</script>
+
+<script id="fsh" type="text/glsl">#version 300 es
+#define PI 3.1415926536
+
+precision mediump float;
+
+uniform float t;
+
+out vec4 frag_color;
+
+float ampl = 1.;
+float lamb = .04;
+float omeg = 0.4 * 2. * PI;
+float v;
+
+float wave (float angle, vec2 q, float t) {
+	float x = dot(q, vec2(cos(angle), sin(angle)));
+	return sin(omeg*(x/v + t));
+}
+
+float f (float symm, vec2 q, float t) {
+	float ret = 0.;
+	for (float i = 0.; i < symm; i += 1.) {
+		ret = ret + ampl/symm*wave(-PI/symm*i, q, t);
+	}
+	return ret;
+}
+
+vec4 palette (float arg) {
+	arg = sin(2.*PI*arg);
+	return vec4(arg, -arg, abs(arg), 1.); }
+
+void main() {
+
+	v = omeg*lamb/2./PI;
+	vec2 q = gl_FragCoord.xy/720.-vec2(0.5, 0.5);
+
+	frag_color = palette(f(7.0, q, t));
+}
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>TITLE</h2>
+
+	<canvas id = "world" width = "720" height = "720"></canvas>
+	<script src="../shared/gl.js"></script>
+	<script>
+let g = new GL(document.getElementById("world"));
+
+g.makeShader("v", document.getElementById("vsh").text, g.gl.VERTEX_SHADER);
+g.makeShader("f", document.getElementById("fsh").text, g.gl.FRAGMENT_SHADER);
+g.makeProgram("p", g.sh.v, g.sh.f);
+
+const x = new Float32Array([1, 1, -1, 1, 1, -1, -1, -1]);
+
+g.makeAttributeBuffer(g.prg.p, "x", 2, g.gl.FLOAT);
+g.setAttributeBuffer(g.prg.p, "x", x);
+
+g.makeUniform(g.prg.p, "t", "1f");
+
+function timestep (t)
+{
+	window.requestAnimationFrame(timestep);
+
+	g.setUniform(g.prg.p, "t", t*1e-3);
+	g.render(g.prg.p, g.gl.TRIANGLE_STRIP);
+
+}
+window.requestAnimationFrame(timestep);
+	
+	
+	</script>
+	
+	<div><p>description.</p></div>
+
+	<div id = "credits">
+	J. Lo, [M] [yyyy].
+	</div>
+
+</div>
+
+</body>
+</html>
