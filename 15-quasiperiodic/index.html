@@ -1,0 +1,124 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<title>Quasiperiodic Wave Patterns</title>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #08052e;
+
+	color: #959;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 {
+	font-size: 18px;
+}
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+
+<script id="vsh" type="text/glsl">#version 300 es
+in vec2 x;
+void main() {
+	gl_Position = vec4(x, 0., 1.); }
+</script>
+
+<script id="fsh" type="text/glsl">#version 300 es
+#define PI 3.1415926536
+
+precision mediump float;
+
+uniform float t;
+
+uniform float ampl, lamb, symm, pair;
+
+out vec4 frag_color;
+
+float wave (float angle, vec2 q, float omeg_t) {
+	float x = dot(q, vec2(cos(angle), sin(angle)));
+	return sin(x/lamb*2.*PI + omeg_t);
+}
+
+float f (vec2 q, float omeg_t) {
+	float ret = 0.;
+	for (float i = 0.; i < symm; i += 1.) {
+		ret = ret + ampl/symm*wave(-pair*PI/symm*i, q, omeg_t);
+	}
+	return ret;
+}
+
+/* palette parameters */
+uniform vec3 pa, pb, pc, pd;
+
+vec4 palette (float arg) {
+	/* -1 to 1, wrap around if out of bounds */
+	arg = sin(.5*PI*arg);
+	
+	vec3 col = pa + pb*cos(2.*PI*(pc*arg+pd));
+	return vec4(col, 1.);
+}
+
+void main() {
+
+	vec2 q = gl_FragCoord.xy/720.-vec2(0.5, 0.5);
+
+	frag_color = palette(f(q, t));
+}
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>QUASIPERIODIC WAVE PATTERNS</h2>
+
+	<canvas id = "world" width = "720" height = "720"></canvas>
+	<script src="../shared/gl.js"></script>
+	<script src="quasiperiodic.js"></script>
+	
+	<div><p>Plane waves travelling in different directions superpose to form periodic and quasiperiodic patterns. Plane coloured by amplitude, colour scheme adopted from the work of Íñigo Quílez.</p>
+	
+	<ul>
+	<li>0 - 9: symmetry (4-fold to 13-fold)</li>
+	<li>&larr;/&rarr;: adjust frequency</li>
+	<li>&uarr;/&darr;: adjust wavelength</li>
+	<li>SPACE: toggle parity (for odd symmetries)</li>
+	</ul>
+	</div>
+
+	<div id = "credits">
+	J. Lo, May 2018.
+	</div>
+
+</div>
+
+</body>
+</html>

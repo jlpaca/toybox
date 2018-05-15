@@ -1,104 +1,3 @@
-<!DOCTYPE HTML>
-<html>
-<head>
-<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
-<style>
-html, body {
-	margin: 0; padding: 0;
-	background-color: #000;
-	color: #999;
-
-	font-family: 'open sans', sans-serif;
-	font-size: 14px;
-}
-h2 { font-size: 18px; }
-
-/*UI*/
-
-#container {
-	width: 720px;
-	margin: 4px auto;
-}
-#credits{
-	margin-top: 16px;
-	font-size: 12px;
-}
-
-/* WORLD*/
-
-#world {
-	border: 1px #ccc none;/*dashed;*/
-
-	margin: 4px auto;
-
-	position: relative;
-
-	width: 720px;
-	height: 720px;
-
-	/*overflow: hidden;*/
-}
-
-</style>
-
-<script id="vsh" type="text/glsl">#version 300 es
-in vec2 x;
-void main() {
-	gl_Position = vec4(x, 0., 1.); }
-</script>
-
-<script id="fsh" type="text/glsl">#version 300 es
-#define PI 3.1415926536
-
-precision mediump float;
-
-uniform float t;
-
-uniform float ampl, lamb, symm;
-
-out vec4 frag_color;
-
-float wave (float angle, vec2 q, float omeg_t) {
-	float x = dot(q, vec2(cos(angle), sin(angle)));
-	return sin(x/lamb*2.*PI + omeg_t);
-}
-
-float f (vec2 q, float omeg_t) {
-	float ret = 0.;
-	for (float i = 0.; i < symm; i += 1.) {
-		ret = ret + ampl/symm*wave(-PI/symm*i, q, omeg_t);
-	}
-	return ret;
-}
-
-/* palette parameters */
-uniform vec3 pa, pb, pc, pd;
-
-vec4 palette (float arg) {
-	/* -1 to 1, wrap around if out of bounds */
-	arg = sin(.5*PI*arg);
-	
-	vec3 col = pa + pb*cos(2.*PI*(pc*arg+pd));
-	return vec4(col, 1.);
-}
-
-void main() {
-
-	vec2 q = gl_FragCoord.xy/720.-vec2(0.5, 0.5);
-
-	frag_color = palette(f(q, t));
-}
-</script>
-
-</head>
-<body>
-
-<div id = "container">
-	<h2>TITLE</h2>
-
-	<canvas id = "world" width = "720" height = "720"></canvas>
-	<script src="../shared/gl.js"></script>
-	<script>
 let g = new GL(document.getElementById("world"));
 
 g.makeShader("v", document.getElementById("vsh").text, g.gl.VERTEX_SHADER);
@@ -114,16 +13,18 @@ g.makeUniform(g.prg.p, "t", "1f");
 g.makeUniform(g.prg.p, "ampl", "1f");
 g.makeUniform(g.prg.p, "lamb", "1f");
 g.makeUniform(g.prg.p, "symm", "1f");
+g.makeUniform(g.prg.p, "pair", "1f");
 
 g.makeUniform(g.prg.p, "pa", "3fv");
 g.makeUniform(g.prg.p, "pb", "3fv");
 g.makeUniform(g.prg.p, "pc", "3fv");
 g.makeUniform(g.prg.p, "pd", "3fv");
 
-let ampl = 1.2;
+let ampl = 1.0;
 let lamb = 0.05;
 let omeg = 2.4;//0.4 * 2 * Math.PI;
 let symm = 5.0;
+let pair = 1.0;
 
 let target_lamb = lamb;
 let target_omeg = omeg;
@@ -139,6 +40,7 @@ function modifyWaves ()
 	g.setUniform(g.prg.p, "ampl", ampl);
 	g.setUniform(g.prg.p, "lamb", lamb);
 	g.setUniform(g.prg.p, "symm", symm);
+	g.setUniform(g.prg.p, "pair", pair);
 }
 
 function modifyColours () {
@@ -183,7 +85,9 @@ window.addEventListener('keydown', function (e) {
 
 		target_omeg = Math.min(19.2, target_omeg);
 	}
-	console.log(target_omeg);
+
+	if (e.key === " ") { pair = 3 - pair; }
+	if (symm % 2 === 0) { pair = 1; }
 
 	
 });
@@ -212,16 +116,3 @@ modifyWaves();
 modifyColours();
 
 window.requestAnimationFrame(timestep);
-
-	</script>
-	
-	<div><p>description.</p></div>
-
-	<div id = "credits">
-	J. Lo, [M] [yyyy].
-	</div>
-
-</div>
-
-</body>
-</html>
