@@ -22,8 +22,8 @@ g.makeUniform(g.prg.p, "pd", "3fv");
 
 let ampl = 1.0;
 let lamb = 0.05;
-let omeg = 2.4;//0.4 * 2 * Math.PI;
-let symm = 5.0;
+let omeg = 4.8;//0.4 * 2 * Math.PI;
+let symm = 7.0;
 let pair = 1.0;
 
 let target_lamb = lamb;
@@ -40,7 +40,7 @@ function modifyWaves ()
 	g.setUniform(g.prg.p, "ampl", ampl);
 	g.setUniform(g.prg.p, "lamb", lamb);
 	g.setUniform(g.prg.p, "symm", symm);
-	g.setUniform(g.prg.p, "pair", pair);
+	g.setUniform(g.prg.p, "pair", symm % 2 ? pair : 1);
 }
 
 function modifyColours () {
@@ -77,18 +77,16 @@ window.addEventListener('keydown', function (e) {
 
 	if (e.key === "ArrowLeft") {
 		target_omeg =
-		target_omeg <= 0.7 ? 0 : target_omeg / 2;
+		target_omeg <= 1.3 ? 0 : target_omeg / 2;
 	}
 	else if (e.key === "ArrowRight") {
 		target_omeg = 
-		target_omeg < 0.5 ? 0.6: target_omeg*2;
+		target_omeg < 1.1 ? 1.2 : target_omeg*2;
 
 		target_omeg = Math.min(19.2, target_omeg);
 	}
 
 	if (e.key === " ") { pair = 3 - pair; }
-	if (symm % 2 === 0) { pair = 1; }
-
 	
 });
 function relax(a, b, x) {
