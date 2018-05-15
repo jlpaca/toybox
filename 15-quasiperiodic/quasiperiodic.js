@@ -64,7 +64,6 @@ function randomiseColours ()
 }
 
 window.addEventListener('keydown', function (e) {
-	console.log(e.key);
 	/* symmetry */
 	if (parseInt(e.key) < 10) {
 		symm = Number(e.key) + (Number(e.key < 4 ? 10: 0));
@@ -83,7 +82,7 @@ window.addEventListener('keydown', function (e) {
 		target_omeg = 
 		target_omeg < 1.1 ? 1.2 : target_omeg*2;
 
-		target_omeg = Math.min(19.2, target_omeg);
+		target_omeg = Math.min(38.4, target_omeg);
 	}
 
 	if (e.key === " ") { pair = 3 - pair; }
@@ -98,7 +97,7 @@ function timestep ()
 {
 	window.requestAnimationFrame(timestep);
 
-	t += omeg*dt;
+	t += omeg/pair*dt;
 
 	omeg = relax(omeg, target_omeg, 0.5);
 	lamb = relax(lamb, target_lamb, 0.9);
