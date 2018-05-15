@@ -54,33 +54,25 @@ precision mediump float;
 
 uniform float t;
 
-uniform float ampl;
-uniform float lamb;
-uniform float omeg;
-uniform float symm;
+uniform float ampl, lamb, symm;
 
 out vec4 frag_color;
 
-float v;
-
-float wave (float angle, vec2 q, float t) {
+float wave (float angle, vec2 q, float omeg_t) {
 	float x = dot(q, vec2(cos(angle), sin(angle)));
-	return sin(omeg*(x/v + t));
+	return sin(x/lamb*2.*PI + omeg_t);
 }
 
-float f (vec2 q, float t) {
+float f (vec2 q, float omeg_t) {
 	float ret = 0.;
 	for (float i = 0.; i < symm; i += 1.) {
-		ret = ret + ampl/symm*wave(-PI/symm*i, q, t);
+		ret = ret + ampl/symm*wave(-PI/symm*i, q, omeg_t);
 	}
 	return ret;
 }
 
 /* palette parameters */
-vec3 pa = vec3(0.5, 0.5, 0.5);
-vec3 pb = vec3(0.5, 0.5, 0.5);
-vec3 pc = vec3(1.0, 1.0, 0.0);
-vec3 pd = vec3(0.5, 0.7, 0.18);
+uniform vec3 pa, pb, pc, pd;
 
 vec4 palette (float arg) {
 	/* -1 to 1, wrap around if out of bounds */
@@ -88,14 +80,10 @@ vec4 palette (float arg) {
 	
 	vec3 col = pa + pb*cos(2.*PI*(pc*arg+pd));
 	return vec4(col, 1.);
-
-//	return vec4(arg, -arg, abs(arg), 1.);
-	
 }
 
 void main() {
 
-	v = omeg*lamb/2./PI;
 	vec2 q = gl_FragCoord.xy/720.-vec2(0.5, 0.5);
 
 	frag_color = palette(f(q, t));
@@ -125,34 +113,106 @@ g.setAttributeBuffer(g.prg.p, "x", x);
 g.makeUniform(g.prg.p, "t", "1f");
 g.makeUniform(g.prg.p, "ampl", "1f");
 g.makeUniform(g.prg.p, "lamb", "1f");
-g.makeUniform(g.prg.p, "omeg", "1f");
 g.makeUniform(g.prg.p, "symm", "1f");
 
-let ampl = 1.0;
+g.makeUniform(g.prg.p, "pa", "3fv");
+g.makeUniform(g.prg.p, "pb", "3fv");
+g.makeUniform(g.prg.p, "pc", "3fv");
+g.makeUniform(g.prg.p, "pd", "3fv");
+
+let ampl = 1.2;
 let lamb = 0.05;
-let omeg = 0.4 * 2 * Math.PI;
+let omeg = 2.4;//0.4 * 2 * Math.PI;
 let symm = 5.0;
 
-function modifyUniforms ()
+let target_lamb = lamb;
+let target_omeg = omeg;
+
+let pv = [
+new Float32Array([0.5, 0.5, 0.5]),
+new Float32Array([0.5, 0.5, 0.5]),
+new Float32Array([1.0, 1.0, 0.0]),
+new Float32Array([0.5, 0.7, 0.18])];
+
+function modifyWaves ()
 {
 	g.setUniform(g.prg.p, "ampl", ampl);
 	g.setUniform(g.prg.p, "lamb", lamb);
-	g.setUniform(g.prg.p, "omeg", omeg);
 	g.setUniform(g.prg.p, "symm", symm);
 }
 
-function timestep (t)
+function modifyColours () {
+	g.setUniform(g.prg.p, "pa", pv[0]);
+	g.setUniform(g.prg.p, "pb", pv[1]);
+	g.setUniform(g.prg.p, "pc", pv[2]);
+	g.setUniform(g.prg.p, "pd", pv[3]);
+}
+
+function randomiseColours ()
+{
+
+	for (let j = 0; j < 3; ++j) {
+		pv[0][j] = 0.2*Math.random()+0.5; }
+	for (let j = 0; j < 3; ++j) {
+		pv[1][j] = 0.8*Math.random(); }
+	for (let j = 0; j < 3; ++j) {
+		pv[2][j] = 1.5*Math.random(); }
+	for (let j = 0; j < 3; ++j) {
+		pv[3][j] = 0.6*Math.random(); }
+}
+
+window.addEventListener('keydown', function (e) {
+	console.log(e.key);
+	/* symmetry */
+	if (parseInt(e.key) < 10) {
+		symm = Number(e.key) + (Number(e.key < 4 ? 10: 0));
+	}
+
+	/* frequency & zoom */
+	if (e.key === "ArrowDown") {	target_lamb /= 1.5; }
+	else if (e.key === "ArrowUp") { target_lamb *= 1.5; }
+	target_lamb = Math.max(2/90, Math.min(0.1125, target_lamb));
+
+	if (e.key === "ArrowLeft") {
+		target_omeg =
+		target_omeg <= 0.7 ? 0 : target_omeg / 2;
+	}
+	else if (e.key === "ArrowRight") {
+		target_omeg = 
+		target_omeg < 0.5 ? 0.6: target_omeg*2;
+
+		target_omeg = Math.min(19.2, target_omeg);
+	}
+	console.log(target_omeg);
+
+	
+});
+function relax(a, b, x) {
+	return a * (1-x) + b * x;
+}
+
+let t = 0; dt = 1e-2;
+function timestep ()
 {
 	window.requestAnimationFrame(timestep);
 
-	g.setUniform(g.prg.p, "t", t*1e-3);
-	modifyUniforms();
-	g.render(g.prg.p, g.gl.TRIANGLE_STRIP);
+	t += omeg*dt;
 
+	omeg = relax(omeg, target_omeg, 0.5);
+	lamb = relax(lamb, target_lamb, 0.9);
+
+	/* send uniforms & render */
+	g.setUniform(g.prg.p, "t", t);
+	modifyWaves();
+	g.render(g.prg.p, g.gl.TRIANGLE_STRIP);
 }
+
+/* send defaults */
+modifyWaves();
+modifyColours();
+
 window.requestAnimationFrame(timestep);
-	
-	
+
 	</script>
 	
 	<div><p>description.</p></div>
