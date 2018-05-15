@@ -97,7 +97,7 @@ function timestep ()
 {
 	window.requestAnimationFrame(timestep);
 
-	t += omeg/pair*dt;
+	t += omeg/(symm % 2 ? pair : 1)*dt;
 
 	omeg = relax(omeg, target_omeg, 0.5);
 	lamb = relax(lamb, target_lamb, 0.9);
