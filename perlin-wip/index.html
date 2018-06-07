@@ -1,0 +1,427 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720;
+	height: 720;
+
+	image-rendering: pixelated;
+	/*overflow: hidden;*/
+}
+
+</style>
+
+<script id = "v_quad" type = "text/glsl">#version 300 es
+in vec2 x; void main() { gl_Position = vec4(x, 0., 1.); }
+</script>
+
+<!-- draws particles at position according to data texture -->
+<script id = "v_img" type = "text/glsl">#version 300 es
+uniform sampler2D dat;
+in vec2 ij;
+
+out float age;
+
+void main() {
+	vec4 col = texelFetch(dat, ivec2(ij), 0);
+
+	age = col.z;
+
+	gl_Position = vec4(col.xy, 0., 1.);
+}
+
+</script>
+
+<!-- specifies the colour of particles -->
+<script id = "f_img" type = "text/glgl">#version 300 es
+precision mediump float;
+
+in float age;
+out vec4 frag_colour;
+
+void main () {
+	frag_colour = vec4(1., 1., 1., 1.);//1.-age);
+}
+</script>
+
+<!-- renders a faded copy of a previous frame -->
+<script id = "f_fade" type = "text/glsl">#version 300 es
+precision mediump float;
+
+uniform sampler2D prev;
+
+out vec4 frag_colour;
+void main() {
+	frag_colour = mix(
+		texelFetch(prev, ivec2(gl_FragCoord.xy), 0),
+		vec4(0., 0., 0., 1.),
+		0.02);
+}
+</script>
+
+<!-- integrate particle positions & write to data texture -->
+<script id = "f_step" type = "text/glsl">#version 300 es
+#define M 720.;
+precision mediump float;
+
+uniform sampler2D prev;
+uniform float time;
+
+uniform float max_age;
+
+out vec4 frag_colour;
+
+/* functions & consts for noise field generation */
+
+const vec3 grad[12] = vec3[12](
+	vec3( 1., 1., 0.), vec3( 1., 0., 1.), vec3( 0., 1., 1.),
+	vec3( 1.,-1., 0.), vec3( 1., 0.,-1.), vec3( 0., 1.,-1.),
+	vec3(-1., 1., 0.), vec3(-1., 0., 1.), vec3( 0.,-1., 1.),
+	vec3(-1.,-1., 0.), vec3(-1., 0.,-1.), vec3( 0.,-1.,-1.)
+);
+
+const vec3 offset[8] = vec3[8](
+	vec3(0., 0., 0.), vec3(0., 0., 1.), vec3(0., 1., 0.), vec3(0., 1., 1.),
+	vec3(1., 0., 0.), vec3(1., 0., 1.), vec3(1., 1., 0.), vec3(1., 1., 1.)
+);
+
+vec3 terp(vec3 t) { return t*t*t*(t*(t*6.-15.)+10.);	}
+vec3 bump(vec3 t) { return t*t*(t*(t*30.-60.)+30.);		}
+vec3 bimp(vec3 t) { return t*t*t*(t*(t*36.-75.)+40.);	}
+
+vec3 grad_lookup(vec3 st) {
+    return grad[int(fract(sin(dot(st,
+	vec3(12.9898, 40.931, 78.233)))
+	*43758.5453123)*12.)];
+}
+
+vec2 field (vec3 co, float gridsize) {
+
+	co = co/gridsize;
+	vec3 gridco = floor(co);
+	vec3 f = co - vec3(gridco);
+
+	vec3 w = terp(f);
+	vec3 dw = bump(f);
+	vec3 dw2 = bimp(f);
+
+	vec3 g[4];
+	for (int i = 0; i < 4; ++i) {
+		g[i] = mix(
+		grad_lookup(gridco+offset[2*i  ]),
+		grad_lookup(gridco+offset[2*i+1]), w.z);
+	}
+	vec4 g1 = vec4(g[0].xy, g[1].xy);
+	vec4 g2 = vec4(g[2].xy, g[3].xy);
+
+	/* ugly closed-form gradient */
+	return vec2(
+	((g[0].y + (g[2].y-g[0].y)*w.x) + ((g[1].x-g[0].x)*f.x - g[1].y +
+	((g[0].x-g[2].x-g[1].x+g[3].x)*f.x + g[2].x + g[1].y - g[3].x - g[3].y)*w.x)*dw.y +
+	((g[1].y-g[0].y) + (g[0].y-g[2].y-g[1].y+g[3].y)*w.x)*dw2.y)*-1.,
+	((g[0].x + (g[1].x-g[0].x)*w.y) + ((g[2].y-g[0].y)*f.y - g[2].x +
+	((g[0].y-g[2].y-g[1].y+g[3].y)*f.y + g[2].x + g[1].y - g[3].x - g[3].y)*w.y)*
+	dw.x + ((g[2].x-g[0].x) + (g[0].x-g[2].x-g[1].x+g[3].x)*w.y)*dw2.x)*1.);
+}
+
+float random (vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898,78.233)))*43758.5453123) +
+	sin(199.73*time)*0.05;
+}
+void main () {
+	vec4 info = texelFetch(prev, ivec2(gl_FragCoord.xy), 0);
+
+	vec2 xy = info.xy;
+	float age = info.z;
+
+	vec2 v =
+	0.001*field(vec3(xy, time/16.), 0.125)+
+	0.001*field(vec3(xy, time/32.), 0.25)+
+	0.001*field(vec3(xy, time/64.), 0.5);
+
+	xy += v;
+	age += 1./max_age;
+
+	if (age > 1.) {
+		xy = vec2(
+			random(vec2(xy.x, xy.y))*2. - 1.,
+			random(vec2(xy.y, xy.x))*2. - 1.
+		);
+		age = 0.;
+	}
+
+	frag_colour = vec4(xy, age, 0.);
+}
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>TITLE</h2>
+
+	<canvas id = "world" width = "720" height = "720"></canvas>
+	<script>
+		const canv = document.getElementById("world");
+		const gl = canv.getContext("webgl2");
+
+		if (!gl) {
+			throw "error: webgl2 not supported.";
+		}
+
+		const ext = gl.getExtension("EXT_color_buffer_float");
+		if (!ext) {
+			throw "error: rendering to float texture not supported.";
+		}
+
+	
+		function makeShader (gl, src, type) {
+			const sh = gl.createShader(type);
+			gl.shaderSource(sh, src);
+			gl.compileShader(sh);
+			if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+				throw "error compiling shader: " +
+				gl.getShaderInfoLog(sh);
+			}
+			return sh;
+		}
+
+		function makeProgram (gl, vsh, fsh) {
+			const prg = gl.createProgram();
+			gl.attachShader(prg, vsh);
+			gl.attachShader(prg, fsh);
+			gl.linkProgram(prg);
+			if (!gl.getProgramParameter(prg, gl.LINK_STATUS)) {
+				throw "error linking program: " +
+				gl.getProgramInfoLog(prg);
+			}
+			return prg;
+		}
+
+		function makeTexture (gl, texunit, fi, w, h, f, type, data, minf, magf, ws, wt) {
+			const tex = gl.createTexture();
+			gl.activeTexture(gl["TEXTURE"+texunit]);
+			gl.bindTexture(gl.TEXTURE_2D, tex);
+			gl.texImage2D(gl.TEXTURE_2D, 0, fi, w, h, 0, f, type, data);
+
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minf);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magf);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, ws);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wt);
+
+			return tex;
+		}
+
+		function makeFramebuffer (gl, tex, texunit) {
+			const fbf = gl.createFramebuffer();
+			gl.bindFramebuffer(gl.FRAMEBUFFER, fbf);
+
+			gl.activeTexture(gl["TEXTURE"+texunit]);
+
+			gl.framebufferTexture2D(gl.FRAMEBUFFER,
+			gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+
+			return fbf;
+		}
+
+		function makeBuffer (gl, data, drawtype) {
+			const buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+			gl.bufferData(gl.ARRAY_BUFFER, data, drawtype);
+
+			return buf;
+		}
+
+		function setBuffer(gl, prg, buf, loc, batch, type) {
+			if (prg) { gl.useProgram(prg); }
+			gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+
+			gl.enableVertexAttribArray(loc);
+			gl.vertexAttribPointer(loc, batch, type, false, 0, 0);	
+		}
+
+		function setUniform(gl, prg, loc, type, name, val) {
+			if (prg) { gl.useProgram(prg); }
+			if (type === "1i") {
+				gl.uniform1i(loc, val);
+			} else if (type === "1f") {
+				gl.uniform1f(loc, val);
+			}
+		}
+
+		function render (gl, prg, buf, type, offset, count) {
+			gl.bindFramebuffer(gl.FRAMEBUFFER, buf);
+			gl.useProgram(prg);
+			gl.drawArrays(type, offset, count);
+		}
+
+		/* these are global because I'm a laze */
+		const M = 720;
+		const w = 100;
+
+		const v_quad = makeShader(gl, document.getElementById("v_quad").text, gl.VERTEX_SHADER);
+
+		const ParticleData = function (gl) {
+			this.gl = gl;
+
+			const f_step = makeShader(gl,
+			document.getElementById("f_step").text, gl.FRAGMENT_SHADER);
+
+			this.p_step = makeProgram(gl, v_quad, f_step);
+			this.p_step_prev = gl.getUniformLocation(this.p_step, "prev");
+			this.p_step_time = gl.getUniformLocation(this.p_step, "time");
+			this.p_step_max_age= gl.getUniformLocation(this.p_step, "max_age");
+			this.p_step_x = gl.getAttribLocation(this.p_step, "x");
+
+			const x = new Float32Array([1, 1, 1, -1, -1, 1, -1, -1]);
+			this.xbuf = makeBuffer(gl, x, gl.STATIC_DRAW);
+
+
+			/* data textures and framebuffers */
+			let N = w*w;
+			const data = new Float32Array(w*w*4);
+			for (let i = 0; i < w; ++i) {
+			for (let j = 0; j < w; ++j) {
+				data[4*(w*i+j)  ] = 2*Math.random()-1;
+				data[4*(w*i+j)+1] = 2*Math.random()-1;
+				data[4*(w*i+j)+2] = Math.random();
+				data[4*(w*i+j)+3] = 1;
+			}}
+
+			this.texA = makeTexture(gl, 0, gl.RGBA32F, w, w, gl.RGBA, gl.FLOAT,
+			null, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT);
+			this.fbfA = makeFramebuffer(gl, this.texA, 0);
+
+			this.texB = makeTexture(gl, 1, gl.RGBA32F, w, w, gl.RGBA, gl.FLOAT,
+			data, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT);
+			this.fbfB = makeFramebuffer(gl, this.texB, 1);
+			this.toA = true;
+
+			/* carry over frames */
+			this.f_fade = makeShader(gl, document.getElementById("f_fade").text, gl.FRAGMENT_SHADER);
+			this.p_fade = makeProgram(gl, v_quad, this.f_fade);
+			this.p_fade_x = gl.getAttribLocation(this.p_fade, "x");
+			this.p_fade_prev = gl.getUniformLocation(this.p_fade, "prev");
+
+			const bgtx = new Uint8Array(M*M*4);
+			for (let i = 0; i < M*M; ++i) {
+				bgtx[i*4+0] = 0;
+				bgtx[i*4+1]	= 0;
+				bgtx[i*4+2]	= 0;
+				bgtx[i*4+3]	= 255;
+			}
+
+			this.texP = makeTexture(gl, 2, gl.RGBA, M, M, gl.RGBA, gl.UNSIGNED_BYTE,
+			null, gl.LINEAR, gl.LINEAR, gl.REPEAT, gl.REPEAT);
+			this.fbfP = makeFramebuffer(gl, this.texP, 2);
+
+			this.texQ = makeTexture(gl, 3, gl.RGBA, M, M, gl.RGBA, gl.UNSIGNED_BYTE,
+			bgtx, gl.LINEAR, gl.LINEAR, gl.REPEAT, gl.REPEAT);
+			this.fbfQ = makeFramebuffer(gl, this.texQ, 3);
+
+
+			/* render particles */
+			const v_img = makeShader(gl, document.getElementById("v_img").text, gl.VERTEX_SHADER);
+			const f_img = makeShader(gl, document.getElementById("f_img").text, gl.FRAGMENT_SHADER);
+
+			this.p_img = makeProgram(gl, v_img, f_img);
+			this.p_img_ij = gl.getAttribLocation(this.p_img, "ij");
+			this.p_img_dat = gl.getUniformLocation(this.p_img, "dat");
+
+			const ij = new Float32Array(N*2);
+			for (let i = 0; i < w; ++i) {
+			for (let j = 0; j < w; ++j) {
+				ij[2*(i*w+j)  ] = i;
+				ij[2*(i*w+j)+1] = j;
+			}}
+			this.ijbuf = makeBuffer(gl, ij, gl.STATIC_DRAW);
+
+		}
+		ParticleData.prototype.setParameters = function (params) {
+			setUniform(gl, this.p_step, this.p_step_max_age, "1f", "max_age", params.max_age);
+		}
+		ParticleData.prototype.integrate = function (t) {
+			const gl = this.gl;
+			const toA = this.toA;
+
+			setUniform(gl, this.p_step, this.p_step_prev, "1i", "prev", toA ? 1 : 0);
+			setUniform(gl, this.p_step, this.p_step_time, "1f", "time", t);
+			setBuffer(gl, this.p_step, this.xbuf, this.p_step_x, 2, gl.FLOAT);
+
+			render(gl, this.p_step, toA ? this.fbfA : this.fbfB, gl.TRIANGLE_STRIP, 0, 4);
+			//render(gl, this.p_step, null, gl.TRIANGLE_STRIP, 0, 4);
+
+		}
+		ParticleData.prototype.render = function () {
+			const gl = this.gl;
+			const toA = this.toA;
+
+			/* render a copy of the last frame */
+			setUniform(gl, this.p_fade, this.p_fade_prev, "1i", "prev", toA ? 3 : 2);
+			setBuffer(gl, this.p_fade, this.xbuf, this.p_fade_x, 2, gl.FLOAT);
+			render(gl, this.p_fade, toA ? this.fbfP : this.fbfQ, gl.TRIANGLE_STRIP, 0, 4);
+			render(gl, this.p_fade, null, gl.TRIANGLE_STRIP, 0, 4);
+
+
+			/* render updated locations */
+			setUniform(gl, this.p_img, this.p_img_dat, "1i", "dat", toA ? 1 : 0);
+			setBuffer(gl, this.p_img, this.ijbuf, this.p_img_ij, 2, gl.FLOAT);
+			render(gl, this.p_img, toA ? this.fbfP : this.fbfQ, gl.POINTS, 0, w*w);
+			render(gl, this.p_img, null, gl.POINTS, 0, w*w);
+		}
+		ParticleData.prototype.timestep = function (t) {
+
+			window.requestAnimationFrame(this.timestep.bind(this));
+			p.integrate(t/1000);
+			p.render();
+
+			this.toA = !this.toA;
+		}
+
+		const p = new ParticleData(gl);
+		p.setParameters({ max_age: 300 });
+
+		window.requestAnimationFrame(p.timestep.bind(p));
+
+	</script>
+	
+	<div><p>description.</p></div>
+
+	<div id = "credits">
+	J. Lo, [M] [yyyy].
+	</div>
+
+</div>
+
+</body>
+</html>
