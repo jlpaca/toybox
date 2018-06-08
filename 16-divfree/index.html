@@ -1,0 +1,245 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>Divergence-Free Flow Fields</title>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #000;
+	color: #611;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720;
+	height: 720;
+
+	image-rendering: pixelated;
+	/*overflow: hidden;*/
+}
+
+</style>
+
+<script id = "v_quad" type = "text/glsl">#version 300 es
+in vec2 x; void main() { gl_Position = vec4(x, 0., 1.); }
+</script>
+
+<!-- draws particles at position according to data texture -->
+<script id = "v_img" type = "text/glsl">#version 300 es
+uniform sampler2D dat;
+in vec2 ij;
+
+out float age;
+out float v;
+out vec2 x;
+
+void main() {
+	vec4 col = texelFetch(dat, ivec2(ij), 0);
+
+	x = col.xy;
+	v = col.w;
+	age = col.z;
+
+	gl_Position = vec4(x, 0., 1.);
+}
+
+</script>
+
+<!-- specifies the colour of particles -->
+<script id = "f_img" type = "text/glgl">#version 300 es
+precision mediump float;
+
+in float age;
+in vec2 x;
+in float v;
+
+out vec4 frag_colour;
+
+vec4 scheme (float t) {
+	t = min(t, .8);
+	vec3 a = vec3(.8, .5, .4);
+	vec3 b = vec3(.2, .4, .2);
+	vec3 c = vec3(2., 1., 1.);
+	vec3 d = vec3(.0, .3, .25);
+	return vec4(a + b*cos(6.28*(c*t+d)), 1.);
+}
+
+void main () {
+	float scale = sqrt(v)*12.;
+	frag_colour = scheme(scale);
+}
+</script>
+
+<!-- renders a faded copy of a previous frame -->
+<script id = "f_fade" type = "text/glsl">#version 300 es
+precision mediump float;
+
+uniform sampler2D prev;
+uniform float trail;
+
+out vec4 frag_colour;
+void main() {
+	vec4 bg = vec4(0., 0., 0., 1.);
+	frag_colour = mix(
+		texelFetch(prev, ivec2(gl_FragCoord.xy), 0),
+		bg, 1.-trail)-2e-3;
+	frag_colour = max(frag_colour, bg);
+}
+</script>
+
+<!-- integrate particle positions & write to data texture -->
+<script id = "f_step" type = "text/glsl">#version 300 es
+#define M 720.;
+precision mediump float;
+
+uniform sampler2D prev;
+uniform float time;
+
+uniform float max_age;
+uniform int octave;
+
+out vec4 frag_colour;
+
+/* functions & consts for noise field generation */
+
+const vec3 grad[12] = vec3[12](
+	vec3( 1., 1., 0.), vec3( 1., 0., 1.), vec3( 0., 1., 1.),
+	vec3( 1.,-1., 0.), vec3( 1., 0.,-1.), vec3( 0., 1.,-1.),
+	vec3(-1., 1., 0.), vec3(-1., 0., 1.), vec3( 0.,-1., 1.),
+	vec3(-1.,-1., 0.), vec3(-1., 0.,-1.), vec3( 0.,-1.,-1.)
+);
+
+const vec3 offset[8] = vec3[8](
+	vec3(0., 0., 0.), vec3(0., 0., 1.), vec3(0., 1., 0.), vec3(0., 1., 1.),
+	vec3(1., 0., 0.), vec3(1., 0., 1.), vec3(1., 1., 0.), vec3(1., 1., 1.)
+);
+
+vec3 terp(vec3 t) { return t*t*t*(t*(t*6.-15.)+10.);	}
+vec3 bump(vec3 t) { return t*t*(t*(t*30.-60.)+30.);		}
+vec3 bimp(vec3 t) { return t*t*t*(t*(t*36.-75.)+40.);	}
+
+vec3 grad_lookup(vec3 st) {
+    return grad[int(fract(sin(dot(st,
+	vec3(12.9898, 40.931, 78.233)))
+	*43758.5453123)*12.)];
+}
+
+vec2 field (vec3 co, float gridsize) {
+
+	co = co/gridsize;
+	vec3 gridco = floor(co);
+	vec3 f = co - vec3(gridco);
+
+	vec3 w = terp(f);
+	vec3 dw = bump(f);
+	vec3 dw2 = bimp(f);
+
+	vec3 g[4];
+	for (int i = 0; i < 4; ++i) {
+		g[i] = mix(
+		grad_lookup(gridco+offset[2*i  ]),
+		grad_lookup(gridco+offset[2*i+1]), f.z);
+	}
+	vec4 g1 = vec4(g[0].xy, g[1].xy);
+	vec4 g2 = vec4(g[2].xy, g[3].xy);
+
+	/* ugly closed-form gradient */
+	return vec2(
+	((g[0].y + (g[2].y-g[0].y)*w.x) + ((g[1].x-g[0].x)*f.x - g[1].y +
+	((g[0].x-g[2].x-g[1].x+g[3].x)*f.x + g[2].x + g[1].y - g[3].x - g[3].y)*w.x)*dw.y +
+	((g[1].y-g[0].y) + (g[0].y-g[2].y-g[1].y+g[3].y)*w.x)*dw2.y)*-1.,
+	((g[0].x + (g[1].x-g[0].x)*w.y) + ((g[2].y-g[0].y)*f.y - g[2].x +
+	((g[0].y-g[2].y-g[1].y+g[3].y)*f.y + g[2].x + g[1].y - g[3].x - g[3].y)*w.y)*
+	dw.x + ((g[2].x-g[0].x) + (g[0].x-g[2].x-g[1].x+g[3].x)*w.y)*dw2.x)*1.);
+}
+
+float random (vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898,78.233)))*43758.5453123) +
+	sin(199.73*time)*0.05;
+}
+void main () {
+	vec4 info = texelFetch(prev, ivec2(gl_FragCoord.xy), 0);
+
+	vec2 xy = info.xy;
+	float age = info.z;
+
+	float oct[5];
+	int p2 = 1;
+	for (int i = 0; i < 5; ++i) {
+		oct[i] = float(octave & p2) / float(p2);
+		p2 *= 2;
+	}
+
+	vec2 v = 0.004*((
+	oct[0]*field(vec3(xy, time/12.), 0.0625)+
+	oct[1]*field(vec3(xy, time/17.), 0.125)+
+	oct[2]*field(vec3(xy, time/24.), 0.25)+
+	oct[3]*field(vec3(xy, time/34.), 0.5)+
+	oct[4]*field(vec3(xy, time/48.), 1.0)))/(log(float(octave))+1.);
+
+	xy += v;
+	age += 1./max_age;
+
+	if (age > 1.) {
+		xy = vec2(
+			random(vec2(xy.x, xy.y))*2. - 1.,
+			random(vec2(xy.y, xy.x))*2. - 1.
+		);
+		age = 0.;
+	}
+	//xy = mod(xy+1., 2.)-1.;
+
+	frag_colour = vec4(xy, age, length(v));
+}
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>DIVERGENCE-FREE FLOW FIELDS</h2>
+
+	<canvas id = "world" width = "720" height = "720"></canvas>
+	<script src = "../shared/gl2.js"></script>
+	<script src = "divfree.js"></script>
+	
+	<div><p>
+		Particles advected by a time-varying vector field. The field at each point is oriented along the contour lines of a five-octave perlin noise — the divergence of such a field vanishes. The particles are coloured by velocity.
+	</p>
+	<ul>
+	<li>1-5: display individual octaves.</li>
+	<li>R/T: adjust particle trails.</li>
+	<li>D/F: adjust particle feed rate.</li>
+	<li>C/V: adjust time variance.</li>
+	</ul></div>
+
+	<div id = "credits">
+	J. Lo, June 2018.
+	</div>
+
+</div>
+
+</body>
+</html>
