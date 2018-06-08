@@ -69,7 +69,7 @@ void main() {
 
 <!-- specifies the colour of particles -->
 <script id = "f_img" type = "text/glgl">#version 300 es
-precision mediump float;
+precision highp float;
 
 in float age;
 in vec2 x;
@@ -94,7 +94,7 @@ void main () {
 
 <!-- renders a faded copy of a previous frame -->
 <script id = "f_fade" type = "text/glsl">#version 300 es
-precision mediump float;
+precision highp float;
 
 uniform sampler2D prev;
 uniform float trail;
@@ -112,7 +112,7 @@ void main() {
 <!-- integrate particle positions & write to data texture -->
 <script id = "f_step" type = "text/glsl">#version 300 es
 #define M 720.;
-precision mediump float;
+precision highp float;
 
 uniform sampler2D prev;
 uniform float time;
