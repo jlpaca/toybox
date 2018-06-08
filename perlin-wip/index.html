@@ -1,12 +1,13 @@
 <!DOCTYPE HTML>
 <html>
 <head>
+<title>Divergence-Free Flow Fields</title>
 <link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
 <style>
 html, body {
 	margin: 0; padding: 0;
-	background-color: #fff;
-	color: #999;
+	background-color: #000;
+	color: #611;
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
@@ -51,13 +52,17 @@ uniform sampler2D dat;
 in vec2 ij;
 
 out float age;
+out float v;
+out vec2 x;
 
 void main() {
 	vec4 col = texelFetch(dat, ivec2(ij), 0);
 
+	x = col.xy;
+	v = col.w;
 	age = col.z;
 
-	gl_Position = vec4(col.xy, 0., 1.);
+	gl_Position = vec4(x, 0., 1.);
 }
 
 </script>
@@ -67,10 +72,23 @@ void main() {
 precision mediump float;
 
 in float age;
+in vec2 x;
+in float v;
+
 out vec4 frag_colour;
 
+vec4 scheme (float t) {
+	t = min(t, .8);
+	vec3 a = vec3(.8, .5, .4);
+	vec3 b = vec3(.2, .4, .2);
+	vec3 c = vec3(2., 1., 1.);
+	vec3 d = vec3(.0, .3, .25);
+	return vec4(a + b*cos(6.28*(c*t+d)), 1.);
+}
+
 void main () {
-	frag_colour = vec4(1., 1., 1., 1.);//1.-age);
+	float scale = sqrt(v)*12.;
+	frag_colour = scheme(scale);
 }
 </script>
 
@@ -79,13 +97,15 @@ void main () {
 precision mediump float;
 
 uniform sampler2D prev;
+uniform float trail;
 
 out vec4 frag_colour;
 void main() {
+	vec4 bg = vec4(0., 0., 0., 1.);
 	frag_colour = mix(
 		texelFetch(prev, ivec2(gl_FragCoord.xy), 0),
-		vec4(0., 0., 0., 1.),
-		0.02);
+		bg, 1.-trail)-2e-3;
+	frag_colour = max(frag_colour, bg);
 }
 </script>
 
@@ -98,6 +118,7 @@ uniform sampler2D prev;
 uniform float time;
 
 uniform float max_age;
+uniform int octave;
 
 out vec4 frag_colour;
 
@@ -139,7 +160,7 @@ vec2 field (vec3 co, float gridsize) {
 	for (int i = 0; i < 4; ++i) {
 		g[i] = mix(
 		grad_lookup(gridco+offset[2*i  ]),
-		grad_lookup(gridco+offset[2*i+1]), w.z);
+		grad_lookup(gridco+offset[2*i+1]), f.z);
 	}
 	vec4 g1 = vec4(g[0].xy, g[1].xy);
 	vec4 g2 = vec4(g[2].xy, g[3].xy);
@@ -164,10 +185,19 @@ void main () {
 	vec2 xy = info.xy;
 	float age = info.z;
 
-	vec2 v =
-	0.001*field(vec3(xy, time/16.), 0.125)+
-	0.001*field(vec3(xy, time/32.), 0.25)+
-	0.001*field(vec3(xy, time/64.), 0.5);
+	float oct[5];
+	int p2 = 1;
+	for (int i = 0; i < 5; ++i) {
+		oct[i] = float(octave & p2) / float(p2);
+		p2 *= 2;
+	}
+
+	vec2 v = 0.004*((
+	oct[0]*field(vec3(xy, time/12.), 0.0625)+
+	oct[1]*field(vec3(xy, time/17.), 0.125)+
+	oct[2]*field(vec3(xy, time/24.), 0.25)+
+	oct[3]*field(vec3(xy, time/34.), 0.5)+
+	oct[4]*field(vec3(xy, time/48.), 1.0)))/(log(float(octave))+1.);
 
 	xy += v;
 	age += 1./max_age;
@@ -179,8 +209,9 @@ void main () {
 		);
 		age = 0.;
 	}
+	//xy = mod(xy+1., 2.)-1.;
 
-	frag_colour = vec4(xy, age, 0.);
+	frag_colour = vec4(xy, age, length(v));
 }
 </script>
 
@@ -188,7 +219,7 @@ void main () {
 <body>
 
 <div id = "container">
-	<h2>TITLE</h2>
+	<h2>DIVERGENCE-FREE FLOW FIELDS</h2>
 
 	<canvas id = "world" width = "720" height = "720"></canvas>
 	<script>
@@ -287,7 +318,7 @@ void main () {
 
 		/* these are global because I'm a laze */
 		const M = 720;
-		const w = 100;
+		const w = 256;
 
 		const v_quad = makeShader(gl, document.getElementById("v_quad").text, gl.VERTEX_SHADER);
 
@@ -301,6 +332,7 @@ void main () {
 			this.p_step_prev = gl.getUniformLocation(this.p_step, "prev");
 			this.p_step_time = gl.getUniformLocation(this.p_step, "time");
 			this.p_step_max_age= gl.getUniformLocation(this.p_step, "max_age");
+			this.p_step_octave = gl.getUniformLocation(this.p_step, "octave");
 			this.p_step_x = gl.getAttribLocation(this.p_step, "x");
 
 			const x = new Float32Array([1, 1, 1, -1, -1, 1, -1, -1]);
@@ -332,6 +364,7 @@ void main () {
 			this.p_fade = makeProgram(gl, v_quad, this.f_fade);
 			this.p_fade_x = gl.getAttribLocation(this.p_fade, "x");
 			this.p_fade_prev = gl.getUniformLocation(this.p_fade, "prev");
+			this.p_fade_trail= gl.getUniformLocation(this.p_fade, "trail");
 
 			const bgtx = new Uint8Array(M*M*4);
 			for (let i = 0; i < M*M; ++i) {
@@ -366,9 +399,29 @@ void main () {
 			}}
 			this.ijbuf = makeBuffer(gl, ij, gl.STATIC_DRAW);
 
+			this.N = w*w;
+			this.trail = 0.04;
+			this.clock = 0.01;
 		}
 		ParticleData.prototype.setParameters = function (params) {
+			if (params.max_age) {
 			setUniform(gl, this.p_step, this.p_step_max_age, "1f", "max_age", params.max_age);
+			}
+
+			if (params.octave) {
+			setUniform(gl, this.p_step, this.p_step_octave, "1i", "octave", params.octave);
+			}
+
+			if (params.trail) {
+			setUniform(gl, this.p_fade, this.p_fade_trail, "1f", "trail", params.trail);
+			}
+
+			if (params.N) {
+			this.N = Math.min(params.N, w*w);
+			}
+			if (params.clock) {
+			this.clock = params.clock;
+			}
 		}
 		ParticleData.prototype.integrate = function (t) {
 			const gl = this.gl;
@@ -396,29 +449,108 @@ void main () {
 			/* render updated locations */
 			setUniform(gl, this.p_img, this.p_img_dat, "1i", "dat", toA ? 1 : 0);
 			setBuffer(gl, this.p_img, this.ijbuf, this.p_img_ij, 2, gl.FLOAT);
-			render(gl, this.p_img, toA ? this.fbfP : this.fbfQ, gl.POINTS, 0, w*w);
-			render(gl, this.p_img, null, gl.POINTS, 0, w*w);
+			render(gl, this.p_img, toA ? this.fbfP : this.fbfQ, gl.POINTS, 0, this.N);
+			render(gl, this.p_img, null, gl.POINTS, 0, this.N);
 		}
-		ParticleData.prototype.timestep = function (t) {
+
+		let time = Math.random()*1024-512;
+		ParticleData.prototype.timestep = function () {
+
+			time += this.clock;
 
 			window.requestAnimationFrame(this.timestep.bind(this));
-			p.integrate(t/1000);
+			p.integrate(time);
 			p.render();
 
 			this.toA = !this.toA;
 		}
 
 		const p = new ParticleData(gl);
-		p.setParameters({ max_age: 300 });
+		p.setParameters({
+			max_age: 120,
+			trail: Math.exp(-p.trail),
+			octave: 31,
+			N: 128*128,
+			clock: p.clock
+		});
+
+		let numkeysdown = [0, 0, 0, 0, 0];
+		function encode(arr) {
+			let ret = 0;
+			let p = 1;
+			for (let i = 0; i < arr.length; ++i, p *= 2) {
+				ret |= p*arr[i];
+			}
+			if (ret === 0) { ret = 31; }
+			return ret;
+		}
+		function modulate(val, up, step, min, max, bottom) {
+			if (up) {
+				val = val*step;
+				if (val < min) { val = min; }
+				val = Math.min(val, max);
+			} else {
+				val = val/step;
+				if (bottom !== undefined && val < min) { val = bottom; }
+			}
+			return val;
+		}
+		window.addEventListener('keydown', function (e) {
+			if (event.repeat) { return; }
+			let num = parseInt(e.key);
+			if (0 < num && num < 6) {
+				numkeysdown[num-1] = 1;
+			}
+			if (e.key === 'v') {
+				p.clock = modulate(p.clock, true, 2, 0.0025, 0.08, 0.0025);
+			} else if (e.key === 'c') {
+				p.clock = modulate(p.clock, false, 2, 0.0025, 0.08, 0.0025);
+			}
+			if (e.key === 't') {
+				p.trail = Math.max(p.trail/2, 0.01);
+			} else if (e.key === 'r') {
+				p.trail = Math.min(p.trail*2, 1.28);
+			}
+			
+			if (e.key === 'f') {
+				p.N = modulate(Math.sqrt(p.N), true, 2, 16, 256, 16);
+				p.N *= p.N;
+			} else if (e.key === 'd') {
+				p.N = modulate(Math.sqrt(p.N), false, 2, 16, 256, 16);
+				p.N *= p.N;
+			}
+			p.setParameters({
+				octave: encode(numkeysdown),
+				clock: p.clock,
+				trail: Math.exp(-p.trail),
+				N: p.N
+			});
+		});
+		window.addEventListener('keyup', function (e) {
+			if (event.repeat) { return; }
+			let num = parseInt(e.key);
+			if (0 < num && num < 6) {
+				numkeysdown[num-1] = 0;
+				p.setParameters({octave: encode(numkeysdown)});
+			}
+		});
 
 		window.requestAnimationFrame(p.timestep.bind(p));
 
 	</script>
 	
-	<div><p>description.</p></div>
+	<div><p>
+		Particles advected by a time-varying vector field. The field at each point is oriented along the contour lines of a five-octave perlin noise — the divergence of such a field vanishes. The particles are coloured by velocity.
+	</p>
+	<ul>
+	<li>1-5: display individual octaves.</li>
+	<li>R/T: adjust particle trails.</li>
+	<li>D/F: adjust particle feed rate.</li>
+	<li>C/V: adjust time variance.</li>
+	</ul></div>
 
 	<div id = "credits">
-	J. Lo, [M] [yyyy].
+	J. Lo, June 2018.
 	</div>
 
 </div>
