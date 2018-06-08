@@ -27,6 +27,7 @@ const ParticleData = function (gl) {
 	this.p_step_time = gl.getUniformLocation(this.p_step, "time");
 	this.p_step_max_age= gl.getUniformLocation(this.p_step, "max_age");
 	this.p_step_octave = gl.getUniformLocation(this.p_step, "octave");
+	this.p_step_seed = gl.getUniformLocation(this.p_step, "seed");
 	this.p_step_x = gl.getAttribLocation(this.p_step, "x");
 
 	const x = new Float32Array([1, 1, 1, -1, -1, 1, -1, -1]);
@@ -147,7 +148,7 @@ ParticleData.prototype.render = function () {
 	render(gl, this.p_img, null, gl.POINTS, 0, this.N);
 }
 
-let time = Math.random()*1024-512;
+
 ParticleData.prototype.timestep = function () {
 
 	time += this.clock;
@@ -159,6 +160,8 @@ ParticleData.prototype.timestep = function () {
 	this.toA = !this.toA;
 }
 
+
+/* initialise stuff */
 const p = new ParticleData(gl);
 p.setParameters({
 	max_age: 120,
@@ -167,6 +170,8 @@ p.setParameters({
 	N: 128*128,
 	clock: p.clock
 });
+let time = 0;
+setUniform(gl, p.p_step, p.p_step_seed, "1f", "seed", Math.random());
 
 let numkeysdown = [0, 0, 0, 0, 0];
 function encode(arr) {

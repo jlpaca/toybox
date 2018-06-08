@@ -117,6 +117,7 @@ precision mediump float;
 uniform sampler2D prev;
 uniform float time;
 
+uniform float seed;
 uniform float max_age;
 uniform int octave;
 
@@ -140,9 +141,9 @@ vec3 terp(vec3 t) { return t*t*t*(t*(t*6.-15.)+10.);	}
 vec3 bump(vec3 t) { return t*t*(t*(t*30.-60.)+30.);		}
 vec3 bimp(vec3 t) { return t*t*t*(t*(t*36.-75.)+40.);	}
 
-vec3 grad_lookup(vec3 st) {
+vec3 grad_lookup(vec3 st, float sd) {
     return grad[int(fract(sin(dot(st,
-	vec3(12.9898, 40.931, 78.233)))
+	vec3(12.9898, 40.931, 78.233))+sd*347.101)
 	*43758.5453123)*12.)];
 }
 
@@ -159,8 +160,8 @@ vec2 field (vec3 co, float gridsize) {
 	vec3 g[4];
 	for (int i = 0; i < 4; ++i) {
 		g[i] = mix(
-		grad_lookup(gridco+offset[2*i  ]),
-		grad_lookup(gridco+offset[2*i+1]), f.z);
+		grad_lookup(gridco+offset[2*i  ], seed),
+		grad_lookup(gridco+offset[2*i+1], seed), f.z);
 	}
 	vec4 g1 = vec4(g[0].xy, g[1].xy);
 	vec4 g2 = vec4(g[2].xy, g[3].xy);
