@@ -97,14 +97,14 @@ void main () {
 precision highp float;
 
 uniform sampler2D prev;
-uniform float trail;
 
 out vec4 frag_colour;
 void main() {
+	vec2 xy = gl_FragCoord.xy/720.;
 	vec4 bg = vec4(0., 0., 0., 1.);
 	frag_colour = mix(
 		texelFetch(prev, ivec2(gl_FragCoord.xy), 0),
-		bg, 1.-trail)-2e-3;
+		bg, max(((xy.x+xy.y)*(xy.x+xy.y))/12., 0.02))-2e-3;
 	frag_colour = max(frag_colour, bg);
 }
 </script>
@@ -231,7 +231,6 @@ void main () {
 	</p>
 	<ul>
 	<li>1-5: display individual octaves.</li>
-	<li>R/T: adjust particle trails.</li>
 	<li>D/F: adjust particle feed rate.</li>
 	<li>C/V: adjust time variance.</li>
 	</ul></div>

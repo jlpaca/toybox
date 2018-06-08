@@ -59,7 +59,6 @@ const ParticleData = function (gl) {
 	this.p_fade = makeProgram(gl, v_quad, this.f_fade);
 	this.p_fade_x = gl.getAttribLocation(this.p_fade, "x");
 	this.p_fade_prev = gl.getUniformLocation(this.p_fade, "prev");
-	this.p_fade_trail= gl.getUniformLocation(this.p_fade, "trail");
 
 	const bgtx = new Uint8Array(M*M*4);
 	for (let i = 0; i < M*M; ++i) {
@@ -95,7 +94,6 @@ const ParticleData = function (gl) {
 	this.ijbuf = makeBuffer(gl, ij, gl.STATIC_DRAW);
 
 	this.N = w*w;
-	this.trail = 0.04;
 	this.clock = 0.01;
 }
 ParticleData.prototype.setParameters = function (params) {
@@ -105,10 +103,6 @@ ParticleData.prototype.setParameters = function (params) {
 
 	if (params.octave) {
 	setUniform(gl, this.p_step, this.p_step_octave, "1i", "octave", params.octave);
-	}
-
-	if (params.trail) {
-	setUniform(gl, this.p_fade, this.p_fade_trail, "1f", "trail", params.trail);
 	}
 
 	if (params.N) {
@@ -165,7 +159,6 @@ ParticleData.prototype.timestep = function () {
 const p = new ParticleData(gl);
 p.setParameters({
 	max_age: 120,
-	trail: Math.exp(-p.trail),
 	octave: 31,
 	N: 128*128,
 	clock: p.clock
@@ -205,11 +198,6 @@ window.addEventListener('keydown', function (e) {
 	} else if (e.key === 'c') {
 		p.clock = modulate(p.clock, false, 2, 0.0025, 0.08, 0.0025);
 	}
-	if (e.key === 't') {
-		p.trail = Math.max(p.trail/2, 0.01);
-	} else if (e.key === 'r') {
-		p.trail = Math.min(p.trail*2, 1.28);
-	}
 	
 	if (e.key === 'f') {
 		p.N = modulate(Math.sqrt(p.N), true, 2, 16, 256, 16);
@@ -221,7 +209,6 @@ window.addEventListener('keydown', function (e) {
 	p.setParameters({
 		octave: encode(numkeysdown),
 		clock: p.clock,
-		trail: Math.exp(-p.trail),
 		N: p.N
 	});
 });
