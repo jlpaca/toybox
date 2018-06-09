@@ -188,7 +188,6 @@ function modulate(val, up, step, min, max, bottom) {
 	return val;
 }
 window.addEventListener('keydown', function (e) {
-	if (event.repeat) { return; }
 	let num = parseInt(e.key);
 	if (0 < num && num < 6) {
 		numkeysdown[num-1] = 1;
@@ -213,7 +212,6 @@ window.addEventListener('keydown', function (e) {
 	});
 });
 window.addEventListener('keyup', function (e) {
-	if (event.repeat) { return; }
 	let num = parseInt(e.key);
 	if (0 < num && num < 6) {
 		numkeysdown[num-1] = 0;
