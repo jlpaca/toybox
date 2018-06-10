@@ -354,7 +354,7 @@ void main () {
 
 			v.seed();
 			v.pingpong();
-			l.calculate(v.fbfS, generate ? n : remove ? -n : N, cursor);
+			l.calculate(v.fbfS, generate ? n : (remove & n > 1) ? -n : N, cursor);
 			if (generate) { n = Math.min(n+1, N); }
 			if (remove) { n = Math.max(n-1, 1); }
 		}
