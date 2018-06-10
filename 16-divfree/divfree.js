@@ -98,11 +98,11 @@ const ParticleData = function (gl) {
 }
 ParticleData.prototype.setParameters = function (params) {
 	if (params.max_age) {
-	setUniform(gl, this.p_step, this.p_step_max_age, "1f", "max_age", params.max_age);
+	setUniform(gl, this.p_step, this.p_step_max_age, "1f", params.max_age);
 	}
 
 	if (params.octave) {
-	setUniform(gl, this.p_step, this.p_step_octave, "1i", "octave", params.octave);
+	setUniform(gl, this.p_step, this.p_step_octave, "1i", params.octave);
 	}
 
 	if (params.N) {
@@ -116,9 +116,9 @@ ParticleData.prototype.integrate = function (t) {
 	const gl = this.gl;
 	const toA = this.toA;
 
-	setUniform(gl, this.p_step, this.p_step_prev, "1i", "prev", toA ? 1 : 0);
-	setUniform(gl, this.p_step, this.p_step_time, "1f", "time", t);
-	setBuffer(gl, this.p_step, this.xbuf, this.p_step_x, 2, gl.FLOAT);
+	setUniform(gl, this.p_step, this.p_step_prev, "1i", toA ? 1 : 0);
+	setUniform(gl, this.p_step, this.p_step_time, "1f", t);
+	setBuffer(gl, this.p_step, this.p_step_x, this.xbuf, 2, gl.FLOAT);
 
 	render(gl, this.p_step, toA ? this.fbfA : this.fbfB, gl.TRIANGLE_STRIP, 0, 4);
 	//render(gl, this.p_step, null, gl.TRIANGLE_STRIP, 0, 4);
@@ -128,16 +128,18 @@ ParticleData.prototype.render = function () {
 	const gl = this.gl;
 	const toA = this.toA;
 
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+
 	/* render a copy of the last frame */
-	setUniform(gl, this.p_fade, this.p_fade_prev, "1i", "prev", toA ? 3 : 2);
-	setBuffer(gl, this.p_fade, this.xbuf, this.p_fade_x, 2, gl.FLOAT);
+	setUniform(gl, this.p_fade, this.p_fade_prev, "1i", toA ? 3 : 2);
+	setBuffer(gl, this.p_fade, this.p_fade_x, this.xbuf, 2, gl.FLOAT);
 	render(gl, this.p_fade, toA ? this.fbfP : this.fbfQ, gl.TRIANGLE_STRIP, 0, 4);
 	render(gl, this.p_fade, null, gl.TRIANGLE_STRIP, 0, 4);
 
-
 	/* render updated locations */
-	setUniform(gl, this.p_img, this.p_img_dat, "1i", "dat", toA ? 1 : 0);
-	setBuffer(gl, this.p_img, this.ijbuf, this.p_img_ij, 2, gl.FLOAT);
+	setUniform(gl, this.p_img, this.p_img_dat, "1i", toA ? 1 : 0);
+	setBuffer(gl, this.p_img, this.p_img_ij, this.ijbuf, 2, gl.FLOAT);
 	render(gl, this.p_img, toA ? this.fbfP : this.fbfQ, gl.POINTS, 0, this.N);
 	render(gl, this.p_img, null, gl.POINTS, 0, this.N);
 }
@@ -164,7 +166,7 @@ p.setParameters({
 	clock: p.clock
 });
 let time = 0;
-setUniform(gl, p.p_step, p.p_step_seed, "1f", "seed", Math.random());
+setUniform(gl, p.p_step, p.p_step_seed, "1f", Math.random());
 
 let numkeysdown = [0, 0, 0, 0, 0];
 function encode(arr) {

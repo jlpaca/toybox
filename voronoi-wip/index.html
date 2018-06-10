@@ -1,0 +1,228 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	/*overflow: hidden;*/
+}
+
+</style>
+
+<script id = "v_quad" type = "text/glsl">#version 300 es
+in vec2 x; void main () { gl_Position = vec4(x, 0., 1.); }
+</script>
+
+<script id = "v_seed" type = "text/glsl">#version 300 es
+uniform sampler2D site;
+in float i;
+void main ()
+{
+	gl_Position = vec4(texelFetch(site, ivec2(i, 0), 0).xy*2.-1., 0., 1.);
+	//gl_PointSize = 4.0;
+}
+</script>
+
+<script id = "f_seed" type = "text/glsl">#version 300 es
+precision mediump float;
+out vec4 frag_colour;
+void main ()
+{
+	vec2 xy = gl_FragCoord.xy/720.;
+	frag_colour = vec4(xy, 1., 1.);
+}
+</script>
+
+<script id = "f_step" type = "text/glsl">#version 300 es
+precision mediump float;
+
+uniform sampler2D prev;
+uniform float stepsize;
+
+out vec4 frag_colour;
+
+const vec4 bg = vec4(0., 0., 0., 1.);
+const vec2[8] dx = vec2[8](
+	vec2( 1., 0.),
+	vec2( 1., 1.),
+	vec2( 0., 1.),
+	vec2(-1., 1.),
+	vec2(-1., 0.),
+	vec2(-1.,-1.),
+	vec2( 0.,-1.),
+	vec2( 1.,-1.)
+);
+
+vec4 compare (vec2 xy, float len, vec4 col, vec2 offset) {
+	vec4 st = texture(prev, xy + offset);
+	if ((col == bg) || ((st != bg) && (distance(st.xy, xy) < len))) {
+		return st;
+	} else {
+		return col;
+	}
+}
+
+void main ()
+{
+	vec2 xy = gl_FragCoord.xy / 720.;
+	float l = stepsize/720.;
+	float len;
+	frag_colour = texture(prev, xy);
+	for (int i = 0; i < 8; ++i) {
+		frag_colour = compare(
+			xy, distance(xy, frag_colour.xy),
+			frag_colour, l*dx[i]);
+	}
+}
+</script>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>TITLE</h2>
+
+	<canvas id = "world" width = "720" height = "720"></canvas>
+	<script src="../shared/gl2.js"></script>	
+	<script>
+		const canv = document.getElementById("world");
+		const gl = canv.getContext("webgl2");
+		if (!gl) { throw "error: webgl2 not supported."; }
+		gl.clearColor(0, 0, 0, 1);
+
+		const ext = gl.getExtension("EXT_color_buffer_float");
+		if (!ext) {	throw "error: rendering to float texture not supported."; }
+
+		/* shared quad shader & buffer data */
+		const v_quad = makeShader(gl, document.getElementById("v_quad").text, gl.VERTEX_SHADER);
+
+		const x = new Float32Array([ 1, 1, 1, -1, -1, 1, -1, -1]);
+		const b_x = makeBuffer(gl, x, gl.STATIC_DRAW);
+
+		const W = 720;
+		const N = 512;
+
+		const Voronoi = function (gl) {
+			this.gl = gl;
+			
+			this.f_step = makeShader(gl,
+			document.getElementById("f_step").text, gl.FRAGMENT_SHADER);
+
+			this.v_seed = makeShader(gl,
+			document.getElementById("v_seed").text, gl.VERTEX_SHADER);
+			this.f_seed = makeShader(gl,
+			document.getElementById("f_seed").text, gl.FRAGMENT_SHADER);
+
+			this.p_step = makeProgram(gl, v_quad, this.f_step);
+			this.p_step_x = gl.getAttribLocation(this.p_step, "x");
+			this.p_step_prev = gl.getUniformLocation(this.p_step, "prev");
+			this.p_step_stepsize = gl.getUniformLocation(this.p_step, "stepsize");
+
+			this.p_seed = makeProgram(gl, this.v_seed, this.f_seed);
+			this.p_seed_i = gl.getAttribLocation(this.p_seed, "i");
+			this.p_seed_site = gl.getUniformLocation(this.p_seed, "site");
+
+			const index = new Float32Array(N);
+			for (let i = 0; i < N; ++i) {
+				index[i] = i;
+			}
+			this.i_buf = makeBuffer(gl, index, gl.STATIC_DRAW);
+
+			const site = new Float32Array(N*4);
+			for (let i = 0; i < N; ++i) {
+				site[4*i+0] = Math.random();
+				site[4*i+1] = Math.random();
+				site[4*i+2] = 0;
+				site[4*i+3] = 0;
+			}
+			this.texS = makeTexture(gl, 0, gl.RGBA32F, N, 1, gl.RGBA, gl.FLOAT,
+			site, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT);
+			this.fbfS = makeFramebuffer(gl, this.texS, 0);
+
+			/* framebuffers for ping-pong-ing */
+			this.texA = makeTexture(gl, 1, gl.RGBA32F, W, W, gl.RGBA, gl.FLOAT,
+			null, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT);
+			this.fbfA = makeFramebuffer(gl, this.texA, 1);
+
+			this.texB = makeTexture(gl, 2, gl.RGBA32F, W, W, gl.RGBA, gl.FLOAT,
+			null, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT);
+			this.fbfB = makeFramebuffer(gl, this.texB, 2);
+
+			this.toA = true;
+		}
+		Voronoi.prototype.seed = function () {
+			const gl = this.gl;
+
+			setBuffer(gl, this.p_seed, this.p_seed_i, this.i_buf, 1, gl.FLOAT);
+			setUniform(gl, this.p_seed, this.p_seed_site, "1i", 0);
+
+			render(gl, this.p_seed, this.fbfB, gl.POINTS, 0, N, true);
+			render(gl, this.p_seed, null, gl.POINTS, 0, N, true);
+		}
+		Voronoi.prototype.pingpong = function () {
+			const gl = this.gl;
+			setBuffer(gl, this.p_step, this.p_step_x, b_x, 2, gl.FLOAT);
+
+			let stepsize = 720;
+			const iter = Math.log2(stepsize)+1;
+			gl.useProgram(this.p_step);
+
+			for (let i = 0; i < iter; ++i) {
+				setUniform(gl, null, this.p_step_prev, "1i", this.toA ? 2 : 1);
+				setUniform(gl, null, this.p_step_stepsize, "1f", stepsize);
+				render(gl, null, this.toA ? this.fbfA : this.fbfB, gl.TRIANGLE_STRIP, 0, 4);
+
+				this.toA = ! this.toA;
+				stepsize /= 2;
+			}
+			render(gl, this.p_step, null, gl.TRIANGLE_STRIP, 0, 4);
+
+		}
+
+		const v = new Voronoi(gl);
+		v.seed();
+		v.pingpong();
+		
+	</script>
+	<div><p>description.</p></div>
+
+	<div id = "credits">
+	J. Lo, [M] [yyyy].
+	</div>
+
+</div>
+
+</body>
+</html>

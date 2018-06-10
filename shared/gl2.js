@@ -55,7 +55,7 @@ function makeBuffer (gl, data, drawtype) {
 	return buf;
 }
 
-function setBuffer(gl, prg, buf, loc, batch, type) {
+function setBuffer(gl, prg, loc, buf, batch, type) {
 	if (prg) { gl.useProgram(prg); }
 	gl.bindBuffer(gl.ARRAY_BUFFER, buf);
 
@@ -63,7 +63,7 @@ function setBuffer(gl, prg, buf, loc, batch, type) {
 	gl.vertexAttribPointer(loc, batch, type, false, 0, 0);	
 }
 
-function setUniform(gl, prg, loc, type, name, val) {
+function setUniform(gl, prg, loc, type, val) {
 	if (prg) { gl.useProgram(prg); }
 	if (type === "1i") {
 		gl.uniform1i(loc, val);
@@ -72,8 +72,14 @@ function setUniform(gl, prg, loc, type, name, val) {
 	}
 }
 
-function render (gl, prg, buf, type, offset, count) {
+function clear (gl, buf) {
 	gl.bindFramebuffer(gl.FRAMEBUFFER, buf);
-	gl.useProgram(prg);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+}
+
+function render (gl, prg, buf, type, offset, count, clr) {
+	if (prg) { gl.useProgram(prg); }
+	gl.bindFramebuffer(gl.FRAMEBUFFER, buf);
+	if (clr === true) { gl.clear(gl.COLOR_BUFFER_BIT); }
 	gl.drawArrays(type, offset, count);
 }
