@@ -48,20 +48,27 @@ in vec2 x; void main () { gl_Position = vec4(x, 0., 1.); }
 <script id = "v_seed" type = "text/glsl">#version 300 es
 uniform sampler2D site;
 in float i;
+out float j;
 void main ()
 {
 	gl_Position = vec4(texelFetch(site, ivec2(i, 0), 0).xy*2.-1., 0., 1.);
-	//gl_PointSize = 4.0;
+	j = i;
+	gl_PointSize = 4.0;
 }
 </script>
 
 <script id = "f_seed" type = "text/glsl">#version 300 es
 precision mediump float;
+
+in float j;
+uniform sampler2D site;
+
 out vec4 frag_colour;
+
 void main ()
 {
-	vec2 xy = gl_FragCoord.xy/720.;
-	frag_colour = vec4(xy, 1., 1.);
+	vec2 xy = texelFetch(site, ivec2(j, 0), 0).xy;
+	frag_colour = vec4(xy, j, 1.);
 }
 </script>
 
@@ -75,14 +82,8 @@ out vec4 frag_colour;
 
 const vec4 bg = vec4(0., 0., 0., 1.);
 const vec2[8] dx = vec2[8](
-	vec2( 1., 0.),
-	vec2( 1., 1.),
-	vec2( 0., 1.),
-	vec2(-1., 1.),
-	vec2(-1., 0.),
-	vec2(-1.,-1.),
-	vec2( 0.,-1.),
-	vec2( 1.,-1.)
+	vec2( 1., 0.), vec2( 1., 1.), vec2( 0., 1.), vec2(-1., 1.),
+	vec2(-1., 0.), vec2(-1.,-1.), vec2( 0.,-1.), vec2( 1.,-1.)
 );
 
 vec4 compare (vec2 xy, float len, vec4 col, vec2 offset) {
@@ -108,6 +109,52 @@ void main ()
 }
 </script>
 
+<script id = "f_1", type = "text/glsl">#version 300 es
+#define rho 0.001
+precision mediump float;
+
+uniform sampler2D src;
+
+out vec4 frag_colour;
+
+void main () {
+	int Y = int(gl_FragCoord.y);
+	int s = int(gl_FragCoord.x);
+
+	frag_colour = vec4(0., 0., 0., 1.);
+	float y = gl_FragCoord.y/720.;
+	for (int i = 0; i < 720; ++i) {
+		frag_colour += mix(
+			vec4(0., 0., 0., 0.),
+			vec4(vec2(float(i)/720., y)*rho, rho, 0.),
+			float(int(texelFetch(src, ivec2(i, Y), 0).z) == s));
+	}
+
+}
+</script>
+<script id = "f_2", type = "text/glsl">#version 300 es
+precision mediump float;
+
+uniform sampler2D src;
+
+out vec4 frag_colour;
+
+void main () {
+	ivec2 uv = ivec2(gl_FragCoord.xy);
+
+	int i = uv.x;
+
+	frag_colour = vec4(0., 0., 0., 1.);
+	for (int j = 0; j < 720; ++j) {
+		frag_colour += texelFetch(src, ivec2(i, j), 0);
+	}
+	vec2 Wx = frag_colour.xy;
+	float W = frag_colour.z;
+
+	frag_colour = vec4(Wx/W, 0., 1.);
+}
+
+</script>
 </head>
 <body>
 
@@ -132,7 +179,7 @@ void main ()
 		const b_x = makeBuffer(gl, x, gl.STATIC_DRAW);
 
 		const W = 720;
-		const N = 512;
+		const N = 128;
 
 		const Voronoi = function (gl) {
 			this.gl = gl;
@@ -196,7 +243,7 @@ void main ()
 			setBuffer(gl, this.p_step, this.p_step_x, b_x, 2, gl.FLOAT);
 
 			let stepsize = 720;
-			const iter = Math.log2(stepsize)+1;
+			const iter = Math.log2(stepsize)+2;
 			gl.useProgram(this.p_step);
 
 			for (let i = 0; i < iter; ++i) {
@@ -211,9 +258,51 @@ void main ()
 
 		}
 
+		const Lloyd = function (gl, vor) {
+			this.gl = gl;
+
+			this.f_1= makeShader(gl,
+			document.getElementById("f_1").text, gl.FRAGMENT_SHADER);
+
+			this.f_2= makeShader(gl,
+			document.getElementById("f_2").text, gl.FRAGMENT_SHADER);
+
+			this.p_1 = makeProgram(gl, v_quad, this.f_1);
+			this.p_1_x = gl.getAttribLocation(this.p_1, "x");
+			this.p_1_src = gl.getUniformLocation(this.p_1, "src");
+			setUniform(gl, this.p_1, this.p_1_src, "1i", vor);
+
+			this.p_2 = makeProgram(gl, v_quad, this.f_2);
+			this.p_2_x = gl.getAttribLocation(this.p_2, "x");
+			this.p_2_src = gl.getUniformLocation(this.p_2, "src");
+			setUniform(gl, this.p_2, this.p_2_src, "1i", 3);
+
+			this.texC = makeTexture(gl, 3, gl.RGBA32F, N, W, gl.RGBA, gl.FLOAT,
+			null, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT);
+			this.fbfC = makeFramebuffer(gl, this.texC, 3);
+		}
+		Lloyd.prototype.calculate = function (targ) {
+			const gl = this.gl;
+
+			setBuffer(gl, this.p_1, this.p_1_x, b_x, 2, gl.FLOAT);
+			render(gl, null, this.fbfC, gl.TRIANGLE_STRIP, 0, 4);
+
+			setBuffer(gl, this.p_2, this.p_2_x, b_x, 2, gl.FLOAT);
+			render(gl, null, targ, gl.TRIANGLE_STRIP, 0, 4);
+		}
+
 		const v = new Voronoi(gl);
-		v.seed();
-		v.pingpong();
+		const l = new Lloyd(gl, 2);
+
+
+		function timestep () {
+			window.requestAnimationFrame(timestep);
+
+			v.seed();
+			v.pingpong();
+			l.calculate(v.fbfS);
+		}
+		timestep();
 		
 	</script>
 	<div><p>description.</p></div>
