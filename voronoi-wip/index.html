@@ -5,7 +5,7 @@
 <style>
 html, body {
 	margin: 0; padding: 0;
-	background-color: #fff;
+	background-color: #111;
 	color: #999;
 
 	font-family: 'open sans', sans-serif;
@@ -68,7 +68,7 @@ out vec4 frag_colour;
 void main ()
 {
 	vec2 xy = texelFetch(site, ivec2(j, 0), 0).xy;
-	frag_colour = vec4(xy, j, 1.);
+	frag_colour = vec4(xy, j+1., 1.);
 }
 </script>
 
@@ -127,7 +127,7 @@ void main () {
 		frag_colour += mix(
 			vec4(0., 0., 0., 0.),
 			vec4(vec2(float(i)/720., y)*rho, rho, 0.),
-			float(int(texelFetch(src, ivec2(i, Y), 0).z) == s));
+			float(int(texelFetch(src, ivec2(i, Y), 0).z-1.) == s));
 	}
 
 }
@@ -179,7 +179,7 @@ void main () {
 		const b_x = makeBuffer(gl, x, gl.STATIC_DRAW);
 
 		const W = 720;
-		const N = 128;
+		const N = 360;
 
 		const Voronoi = function (gl) {
 			this.gl = gl;
@@ -296,7 +296,9 @@ void main () {
 
 
 		function timestep () {
-			window.requestAnimationFrame(timestep);
+			window.setTimeout(function () {
+				window.requestAnimationFrame(timestep);
+			}, 80);
 
 			v.seed();
 			v.pingpong();
