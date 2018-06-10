@@ -69,6 +69,8 @@ function setUniform(gl, prg, loc, type, val) {
 		gl.uniform1i(loc, val);
 	} else if (type === "1f") {
 		gl.uniform1f(loc, val);
+	} else if (type === "2f") {
+		gl.uniform2f(loc, val[0], val[1]);
 	}
 }
 

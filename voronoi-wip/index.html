@@ -88,11 +88,8 @@ const vec2[8] dx = vec2[8](
 
 vec4 compare (vec2 xy, float len, vec4 col, vec2 offset) {
 	vec4 st = texture(prev, xy + offset);
-	if ((col == bg) || ((st != bg) && (distance(st.xy, xy) < len))) {
-		return st;
-	} else {
-		return col;
-	}
+	return mix(col, st, float(
+	(col == bg) || ((st != bg) && (distance(st.xy, xy) < len))));
 }
 
 void main ()
@@ -136,6 +133,8 @@ void main () {
 precision mediump float;
 
 uniform sampler2D src;
+uniform int n;
+uniform vec2 cursor;
 
 out vec4 frag_colour;
 
@@ -151,9 +150,12 @@ void main () {
 	vec2 Wx = frag_colour.xy;
 	float W = frag_colour.z;
 
-	frag_colour = vec4(Wx/W, 0., 1.);
+	if (i == n) {
+		frag_colour = vec4(cursor, 0., 1.);
+	} else {
+		frag_colour = vec4(Wx/W+4e-4, 0., 1.);
+	}
 }
-
 </script>
 </head>
 <body>
@@ -180,6 +182,7 @@ void main () {
 
 		const W = 720;
 		const N = 360;
+		let n = 360;
 
 		const Voronoi = function (gl) {
 			this.gl = gl;
@@ -235,8 +238,8 @@ void main () {
 			setBuffer(gl, this.p_seed, this.p_seed_i, this.i_buf, 1, gl.FLOAT);
 			setUniform(gl, this.p_seed, this.p_seed_site, "1i", 0);
 
-			render(gl, this.p_seed, this.fbfB, gl.POINTS, 0, N, true);
-			render(gl, this.p_seed, null, gl.POINTS, 0, N, true);
+			render(gl, this.p_seed, this.fbfB, gl.POINTS, 0, n, true);
+			render(gl, this.p_seed, null, gl.POINTS, 0, n, true);
 		}
 		Voronoi.prototype.pingpong = function () {
 			const gl = this.gl;
@@ -277,23 +280,52 @@ void main () {
 			this.p_2_src = gl.getUniformLocation(this.p_2, "src");
 			setUniform(gl, this.p_2, this.p_2_src, "1i", 3);
 
+			this.p_2_n = gl.getUniformLocation(this.p_2, "n");
+			this.p_2_cursor = gl.getUniformLocation(this.p_2, "cursor");
+
 			this.texC = makeTexture(gl, 3, gl.RGBA32F, N, W, gl.RGBA, gl.FLOAT,
 			null, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT);
 			this.fbfC = makeFramebuffer(gl, this.texC, 3);
 		}
-		Lloyd.prototype.calculate = function (targ) {
+		Lloyd.prototype.calculate = function (targ, ni, cur) {
 			const gl = this.gl;
 
 			setBuffer(gl, this.p_1, this.p_1_x, b_x, 2, gl.FLOAT);
 			render(gl, null, this.fbfC, gl.TRIANGLE_STRIP, 0, 4);
 
 			setBuffer(gl, this.p_2, this.p_2_x, b_x, 2, gl.FLOAT);
+			setUniform(gl, this.p_2, this.p_2_n, "1i", ni); 
+			setUniform(gl, this.p_2, this.p_2_cursor, "2f", cur);
 			render(gl, null, targ, gl.TRIANGLE_STRIP, 0, 4);
+
+			if (generate) { ++n; }
 		}
 
 		const v = new Voronoi(gl);
 		const l = new Lloyd(gl, 2);
 
+		let generate = false;
+		let cursor = [0, 0];
+		function updateCursorLocation (e) {
+			const rect = e.target.getBoundingClientRect();
+			console.log(rect);
+			cursor[0] = (e.clientX - rect.left)/rect.width;
+			cursor[1] = 1-(e.clientY - rect.top)/rect.height;
+		}
+		canv.addEventListener('mousedown', function (e) {
+			generate = true;
+			updateCursorLocation(e);
+		});
+		canv.addEventListener('mousemove', function (e) {
+			updateCursorLocation(e);
+		});
+		canv.addEventListener('mouseup', function (e) {
+			generate = false;
+		});
+		canv.addEventListener('mouseleave', function (e) {
+			generate = false;
+		});
+		
 
 		function timestep () {
 			window.setTimeout(function () {
@@ -302,10 +334,10 @@ void main () {
 
 			v.seed();
 			v.pingpong();
-			l.calculate(v.fbfS);
+			l.calculate(v.fbfS, generate ? n : N, cursor);
+			if (generate) { n = Math.min(n, N); }
 		}
 		timestep();
-		
 	</script>
 	<div><p>description.</p></div>
 
