@@ -111,6 +111,8 @@ void main ()
 precision mediump float;
 
 uniform sampler2D src;
+uniform vec2 cursor;
+uniform int remove;
 
 out vec4 frag_colour;
 
@@ -120,11 +122,17 @@ void main () {
 
 	frag_colour = vec4(0., 0., 0., 1.);
 	float y = gl_FragCoord.y/720.;
+	int j;
+	int jx = int(texture(src, cursor).z-1.);
 	for (int i = 0; i < 720; ++i) {
+		j = int(texelFetch(src, ivec2(i, Y), 0).z-1.);
 		frag_colour += mix(
 			vec4(0., 0., 0., 0.),
 			vec4(vec2(float(i)/720., y)*rho, rho, 0.),
-			float(int(texelFetch(src, ivec2(i, Y), 0).z-1.) == s));
+			float(j == s));
+	}
+	if (s == jx && bool(remove)) {
+		frag_colour = vec4(1., 1., -1., 1.);
 	}
 
 }
@@ -142,6 +150,9 @@ void main () {
 	ivec2 uv = ivec2(gl_FragCoord.xy);
 
 	int i = uv.x;
+	if (texelFetch(src, ivec2(i, 0), 0).z < 0.) {
+		i = n-1;
+	}
 
 	frag_colour = vec4(0., 0., 0., 1.);
 	for (int j = 0; j < 720; ++j) {
@@ -163,7 +174,7 @@ void main () {
 <div id = "container">
 	<h2>TITLE</h2>
 
-	<canvas id = "world" width = "720" height = "720"></canvas>
+	<canvas id = "world" width = "720" height = "720" oncontextmenu="return false;"></canvas>
 	<script src="../shared/gl2.js"></script>	
 	<script>
 		const canv = document.getElementById("world");
@@ -182,7 +193,7 @@ void main () {
 
 		const W = 720;
 		const N = 360;
-		let n = 360;
+		let n = 24;
 
 		const Voronoi = function (gl) {
 			this.gl = gl;
@@ -273,6 +284,8 @@ void main () {
 			this.p_1 = makeProgram(gl, v_quad, this.f_1);
 			this.p_1_x = gl.getAttribLocation(this.p_1, "x");
 			this.p_1_src = gl.getUniformLocation(this.p_1, "src");
+			this.p_1_cursor = gl.getUniformLocation(this.p_1, "cursor");
+			this.p_1_remove = gl.getUniformLocation(this.p_1, "remove");
 			setUniform(gl, this.p_1, this.p_1_src, "1i", vor);
 
 			this.p_2 = makeProgram(gl, v_quad, this.f_2);
@@ -291,29 +304,34 @@ void main () {
 			const gl = this.gl;
 
 			setBuffer(gl, this.p_1, this.p_1_x, b_x, 2, gl.FLOAT);
+			setUniform(gl, this.p_1, this.p_1_cursor, "2f", cursor); 
+			setUniform(gl, this.p_1, this.p_1_remove, "1i", ni < 0 ? 1 : 0); 
 			render(gl, null, this.fbfC, gl.TRIANGLE_STRIP, 0, 4);
 
 			setBuffer(gl, this.p_2, this.p_2_x, b_x, 2, gl.FLOAT);
-			setUniform(gl, this.p_2, this.p_2_n, "1i", ni); 
+			setUniform(gl, this.p_2, this.p_2_n, "1i", Math.abs(ni)); 
 			setUniform(gl, this.p_2, this.p_2_cursor, "2f", cur);
 			render(gl, null, targ, gl.TRIANGLE_STRIP, 0, 4);
-
-			if (generate) { ++n; }
 		}
 
 		const v = new Voronoi(gl);
 		const l = new Lloyd(gl, 2);
 
 		let generate = false;
+		let remove = false
+
 		let cursor = [0, 0];
 		function updateCursorLocation (e) {
 			const rect = e.target.getBoundingClientRect();
-			console.log(rect);
 			cursor[0] = (e.clientX - rect.left)/rect.width;
 			cursor[1] = 1-(e.clientY - rect.top)/rect.height;
 		}
 		canv.addEventListener('mousedown', function (e) {
-			generate = true;
+			if (e.button > 0) {
+				generate = true;
+			} else {
+				remove = true;
+			}
 			updateCursorLocation(e);
 		});
 		canv.addEventListener('mousemove', function (e) {
@@ -321,9 +339,11 @@ void main () {
 		});
 		canv.addEventListener('mouseup', function (e) {
 			generate = false;
+			remove = false;
 		});
 		canv.addEventListener('mouseleave', function (e) {
 			generate = false;
+			remove = false;
 		});
 		
 
@@ -334,8 +354,9 @@ void main () {
 
 			v.seed();
 			v.pingpong();
-			l.calculate(v.fbfS, generate ? n : N, cursor);
-			if (generate) { n = Math.min(n, N); }
+			l.calculate(v.fbfS, generate ? n : remove ? -n : N, cursor);
+			if (generate) { n = Math.min(n+1, N); }
+			if (remove) { n = Math.max(n-1, 1); }
 		}
 		timestep();
 	</script>
