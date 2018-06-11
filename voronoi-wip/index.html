@@ -6,12 +6,15 @@
 html, body {
 	margin: 0; padding: 0;
 	background-color: #111;
-	color: #999;
+	color: #16f;
 
 	font-family: 'open sans', sans-serif;
 	font-size: 14px;
 }
-h2 { font-size: 18px; }
+h2 {
+	color: #8ff;
+	font-size: 18px;
+}
 
 /*UI*/
 
@@ -113,8 +116,15 @@ precision mediump float;
 uniform sampler2D src;
 uniform vec2 cursor;
 uniform int remove;
+uniform float time;
 
 out vec4 frag_colour;
+
+vec2 drunk (vec4 c) {
+	
+	vec2 vel = 0.1*vec2(cos(3.1416*c.x), 0.); /* neat horizontal gradient */
+	return c.xy + vel;
+}
 
 void main () {
 	int Y = int(gl_FragCoord.y);
@@ -124,17 +134,22 @@ void main () {
 	float y = gl_FragCoord.y/720.;
 	int j;
 	int jx = int(texture(src, cursor).z-1.);
+	vec4 c;
 	for (int i = 0; i < 720; ++i) {
-		j = int(texelFetch(src, ivec2(i, Y), 0).z-1.);
+		c = texelFetch(src, ivec2(i, Y), 0);
+		j = int(c.z-1.);
 		frag_colour += mix(
 			vec4(0., 0., 0., 0.),
-			vec4(vec2(float(i)/720., y)*rho, rho, 0.),
+			mix(
+				vec4(vec2(float(i)/720., y)*rho, rho, 0.),
+				vec4(drunk(c)*rho, rho, 0.),
+				float(time > 0.)
+			),
 			float(j == s));
 	}
-	if (s == jx && bool(remove)) {
-		frag_colour = vec4(1., 1., -1., 1.);
-	}
-
+	frag_colour = mix(
+	frag_colour, vec4(1., 1., -1., 1.),
+	float((s == jx) && bool(remove)));
 }
 </script>
 <script id = "f_2", type = "text/glsl">#version 300 es
@@ -158,14 +173,12 @@ void main () {
 	for (int j = 0; j < 720; ++j) {
 		frag_colour += texelFetch(src, ivec2(i, j), 0);
 	}
-	vec2 Wx = frag_colour.xy;
-	float W = frag_colour.z;
 
-	if (i == n) {
-		frag_colour = vec4(cursor, 0., 1.);
-	} else {
-		frag_colour = vec4(Wx/W+4e-4, 0., 1.);
-	}
+	float b = float(i == n);
+
+	vec2 Wx = mix(frag_colour.xy, cursor, b);
+	float W = mix(frag_colour.z, 1., b);
+	frag_colour = vec4(Wx/W, 0., 1.);
 }
 </script>
 </head>
@@ -193,7 +206,7 @@ void main () {
 
 		const W = 720;
 		const N = 360;
-		let n = 24;
+		let n = 23;
 
 		const Voronoi = function (gl) {
 			this.gl = gl;
@@ -286,6 +299,7 @@ void main () {
 			this.p_1_src = gl.getUniformLocation(this.p_1, "src");
 			this.p_1_cursor = gl.getUniformLocation(this.p_1, "cursor");
 			this.p_1_remove = gl.getUniformLocation(this.p_1, "remove");
+			this.p_1_time = gl.getUniformLocation(this.p_1, "time");
 			setUniform(gl, this.p_1, this.p_1_src, "1i", vor);
 
 			this.p_2 = makeProgram(gl, v_quad, this.f_2);
@@ -300,12 +314,13 @@ void main () {
 			null, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT);
 			this.fbfC = makeFramebuffer(gl, this.texC, 3);
 		}
-		Lloyd.prototype.calculate = function (targ, ni, cur) {
+		Lloyd.prototype.calculate = function (targ, ni, cur, t) {
 			const gl = this.gl;
 
 			setBuffer(gl, this.p_1, this.p_1_x, b_x, 2, gl.FLOAT);
 			setUniform(gl, this.p_1, this.p_1_cursor, "2f", cursor); 
 			setUniform(gl, this.p_1, this.p_1_remove, "1i", ni < 0 ? 1 : 0); 
+			setUniform(gl, this.p_1, this.p_1_time, "1f", t);
 			render(gl, null, this.fbfC, gl.TRIANGLE_STRIP, 0, 4);
 
 			setBuffer(gl, this.p_2, this.p_2_x, b_x, 2, gl.FLOAT);
@@ -346,7 +361,8 @@ void main () {
 			remove = false;
 		});
 		
-
+		let time = 0;
+		let relax = false;
 		function timestep () {
 			window.setTimeout(function () {
 				window.requestAnimationFrame(timestep);
@@ -354,9 +370,14 @@ void main () {
 
 			v.seed();
 			v.pingpong();
-			l.calculate(v.fbfS, generate ? n : (remove & n > 1) ? -n : N, cursor);
+			l.calculate(v.fbfS,
+				generate ? n : (remove & n > 1) ? -n : N,
+				cursor,
+				relax ? 0 : time);
 			if (generate) { n = Math.min(n+1, N); }
 			if (remove) { n = Math.max(n-1, 1); }
+
+			time += 0.01;
 		}
 		timestep();
 	</script>
