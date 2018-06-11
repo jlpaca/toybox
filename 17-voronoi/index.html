@@ -189,7 +189,7 @@ void main () {
 	<canvas id = "world" width = "720" height = "720" oncontextmenu="return false;"></canvas>
 	<script src="../shared/gl2.js"></script>	
 	<script src="voronoi.js"></script>
-	<div><p>Lloyd's algorithm(S. Lloyd, 1982) applied to approximate Voronoi diagram generated with jump-flooding as described by Rong & Tan, 2006. Each generating site is repeatedly relaxed towards the centroid of its Voronoi cell.</p>
+	<div><p>Lloyd's algorithm(S. Lloyd, 1982) applied to approximate Voronoi diagram generated with jump-flooding as described by Rong &amp; Tan, 2006. Each generating site is repeatedly relaxed towards the centroid of its Voronoi cell. Centroid calculation done in a fragment shader; the page may be slow or render incorrectly on some hardware.</p>
 
 	<ul>
 	<li>RMB/LMB: add/remove cell.</li>

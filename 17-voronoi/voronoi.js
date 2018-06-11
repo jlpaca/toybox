@@ -13,8 +13,8 @@ const x = new Float32Array([ 1, 1, 1, -1, -1, 1, -1, -1]);
 const b_x = makeBuffer(gl, x, gl.STATIC_DRAW);
 
 const W = 720;
-const N = 360;
-let n = 23;
+const N = 240;
+let n = 36;
 
 const Voronoi = function (gl) {
 	this.gl = gl;
@@ -150,10 +150,10 @@ function updateCursorLocation (e) {
 	cursor[1] = 1-(e.clientY - rect.top)/rect.height;
 }
 canv.addEventListener('mousedown', function (e) {
-	if (e.button > 0) {
-		generate = true;
-	} else {
+	if (e.button == 0) {
 		remove = true;
+	} else {
+		generate = true;
 	}
 	updateCursorLocation(e);
 });
@@ -178,9 +178,7 @@ window.addEventListener('keydown', function (e) {
 
 let time = 0;
 function timestep () {
-	window.setTimeout(function () {
-		window.requestAnimationFrame(timestep);
-	}, 80);
+	window.setTimeout(timestep, 90);
 
 	v.seed();
 	v.pingpong();
