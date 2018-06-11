@@ -54,7 +54,7 @@ h2 {
 	<canvas id = "world" width = "512" height = "512"></canvas>
 
 	<script id = "vsh" type = "text/GLSL">#version 300 es
-	precision mediump float;
+	precision highp float;
 
 	in vec2 vert_x;
 
@@ -65,7 +65,7 @@ h2 {
 	</script>
 
 	<script id = "fsh-sim" type = "text/GLSL">#version 300 es
-	precision mediump float;
+	precision highp float;
 
 	uniform sampler2D tex;
 
@@ -179,7 +179,7 @@ h2 {
 	}
 	</script>
 	<script id = "fsh-img", type = "text/GLSL">#version 300 es
-		precision mediump float;
+		precision highp float;
 
 		uniform sampler2D tex;
 
