@@ -1,0 +1,203 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+<style>
+html, body {
+	margin: 0; padding: 0;
+	background-color: #fff;
+	color: #999;
+
+	font-family: 'open sans', sans-serif;
+	font-size: 14px;
+}
+h2 { font-size: 18px; }
+
+/*UI*/
+
+#container {
+	width: 720px;
+	margin: 4px auto;
+}
+#credits{
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+/* WORLD*/
+
+#world {
+	border: 1px #ccc none;/*dashed;*/
+
+	margin: 4px auto;
+
+	position: relative;
+
+	width: 720px;
+	height: 720px;
+
+	overflow: hidden;
+}
+
+.particle {
+	position: absolute;
+	/*border: 1px solid #000000;*/
+	background-color: #666;
+	width: 8px;
+	height: 8px;
+	border-radius: 4px;
+}
+.p-magnetic {
+	background-color: #f66;
+}
+
+</style>
+
+</head>
+<body>
+
+<div id = "container">
+	<h2>TITLE</h2>
+
+	<div id = "world" width = "720" height = "720"></div>
+	<script src = "../shared/v4.js"></script>
+	<script src = "../shared/spash.js"></script>
+	<script>
+const Particle = function (params) {
+	this.q = [ params.x, params.y, 0, 1 ];
+	this.q_prev = this.q.v4clone();
+	this.a = [ 0, 0, 0, 1 ];
+
+	this.m = params.m;
+}
+Particle.prototype.integrate = function (dt) {
+	let old_q = this.q.v4clone();
+	this.q.v4mul(2).v4sub(this.q_prev)
+		.v4add(this.a.v4mul(dt*dt/2));
+	this.q_prev = old_q;
+
+	/* ad-hoc clamp */
+	this.q[0] = Math.max(0, Math.min(this.q[0], 720));
+	this.q[1] = Math.max(0, Math.min(this.q[1], 720));
+}
+Particle.prototype.initVisual = function (ref) {
+	const div = document.createElement("div");
+	div.classList.add("particle");
+	if (this.m) {
+		div.classList.add("p-magnetic");
+	}
+	ref.appendChild(div);
+
+	this.visual = div;
+}
+Particle.prototype.syncVisual = function () {
+	const div = this.visual;
+	if (!div) { return; }
+
+	const c = 1;//Math.cos(this.theta);
+	const s = 0;//Math.sin(this.theta);
+	const w = 4;
+
+	div.style.transform = "matrix(" +
+	c + "," + (-s) + "," +
+	s + "," +   c  + "," +
+	(this.q[0]-w) + "," + (this.q[1]-w) + ")";
+}
+
+const Lab = function (params) {
+	this.particles = [];
+	this.ref = params.ref;
+	this.dt = 0.1;
+}
+Lab.prototype.addParticle = function (params) {
+	const p = new Particle(params);
+	p.initVisual(this.ref);
+
+	this.particles.push(p);
+}
+Lab.prototype.forces = function () {
+	for (let i = 0; i < this.particles.length; ++i) {
+		const th = Math.random()*Math.PI*2;
+		this.particles[i].a =
+			[ Math.cos(th), Math.sin(th), 0, 1];
+	}
+}
+Lab.prototype.constraints = function () {
+	function constrain (pa, pb) {
+		const u = v4sub(pb.q, pa.q);
+		const d = u.v4mag();
+		const offset = (8-d)/2;
+		if (offset <= 0) { return; }
+
+		pa.q.v4sub(v4mul(offset/d, u));
+		pb.q.v4add(v4mul(offset/d, u));
+
+	}
+
+	for (let i = 0; i < this.particles.length; ++i) {
+	for (let j = i+1; j < this.particles.length; ++j) {
+		constrain(
+			this.particles[i],
+			this.particles[j]);
+	}}
+
+}
+
+Lab.prototype.integrate = function () {
+	for (let i = 0; i < this.particles.length; ++i) {
+		this.particles[i].integrate(this.dt);
+	}
+}
+Lab.prototype.render = function () {
+	for (let i = 0; i < this.particles.length; ++i) {
+		this.particles[i].syncVisual();
+	}
+}
+Lab.prototype.timestep = function () {
+	window.requestAnimationFrame(this.timestep.bind(this));
+	this.forces();
+	this.integrate();	
+	this.constraints();
+	this.render();
+}
+
+
+
+const l = new Lab({ ref: document.getElementById("world") });
+const w = 15;
+for (let i = 0; i < 720/w; ++i) {
+for (let j = 0; j < 720/w; ++j) {
+	l.addParticle({
+		x: w*i,
+		y: w*j,
+		theta: 3.14*Math.random(),
+		m: Math.random() > 0.5 ? 1 : 0
+	});
+}}
+/*
+l.addParticle({
+	x: 300,
+	y: 400,
+	theta: 0,
+	m: 1
+});
+l.addParticle({
+	x: 300,
+	y: 500,
+	theta: 0,
+	m: 1
+});
+*/
+l.timestep();
+
+	</script>	
+	<div><p>description.</p></div>
+
+	<div id = "credits">
+	J. Lo, [M] [yyyy].
+	</div>
+
+</div>
+
+</body>
+</html>
