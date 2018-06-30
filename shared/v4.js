@@ -50,6 +50,10 @@ Array.prototype.v4fromTHREEVector3 = function(v){
 Array.prototype.v4clone = function(v){
 	return [this[0], this[1], this[2], 1];
 }
+Array.prototype.v4set = function(x, y, z){
+	this[0] = x; this[1] = y; this[2] = z;
+	return this;
+}
 Array.prototype.v4add = function(v){
 	this[0] += v[0]; this[1] += v[1];
 	this[2] += v[2]; this[3] = 1;

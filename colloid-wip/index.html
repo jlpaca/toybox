@@ -83,7 +83,7 @@ Particle.prototype.integrate = function (dt) {
 Particle.prototype.initVisual = function (ref) {
 	const div = document.createElement("div");
 	div.classList.add("particle");
-	if (this.m) {
+	if (this.m > 0) {
 		div.classList.add("p-magnetic");
 	}
 	ref.appendChild(div);
@@ -105,6 +105,7 @@ Particle.prototype.syncVisual = function () {
 }
 
 const Lab = function (params) {
+	this.H = params.H;
 	this.particles = [];
 	this.ref = params.ref;
 	this.dt = 0.1;
@@ -117,10 +118,43 @@ Lab.prototype.addParticle = function (params) {
 }
 Lab.prototype.forces = function () {
 	for (let i = 0; i < this.particles.length; ++i) {
+		this.particles[i].a.v4set(0, 0, 0);
+	}
+	/* brownian */
+	for (let i = 0; i < this.particles.length; ++i) {
 		const th = Math.random()*Math.PI*2;
 		this.particles[i].a =
 			[ Math.cos(th), Math.sin(th), 0, 1];
 	}
+	/* dipole-dipole */
+	function dforces (H, pa, pb) {
+		const ma = v4mul(pa.m, H);
+		const mb = v4mul(pb.m, H);
+		const r = v4sub(pb.q, pa.q);
+		const d = v4mag(r);
+
+		const c = 1e4;
+		
+		const F = v4mul(c/Math.pow(d, 5),
+		v4mul(v4dot(ma, r), mb).v4add(
+		v4mul(v4dot(mb, r), ma)).v4add(
+		v4mul(v4dot(ma, mb), r)).v4sub(
+		v4mul(
+			5*v4dot(ma, r)*v4dot(mb, r)/d/d,
+			r)));
+
+		pa.a.v4sub(F);
+		pb.a.v4add(F);
+
+	}
+
+	for (let i = 0; i < this.particles.length; ++i) {
+	for (let j = i+1; j < this.particles.length; ++j) {
+		dforces(
+			this.H,
+			this.particles[i],
+			this.particles[j]);
+	}}
 }
 Lab.prototype.constraints = function () {
 	function constrain (pa, pb) {
@@ -163,7 +197,10 @@ Lab.prototype.timestep = function () {
 
 
 
-const l = new Lab({ ref: document.getElementById("world") });
+const l = new Lab({
+	ref: document.getElementById("world"),
+	H: [ 0, 0, 1, 1 ]
+});
 const w = 15;
 for (let i = 0; i < 720/w; ++i) {
 for (let j = 0; j < 720/w; ++j) {
@@ -171,7 +208,7 @@ for (let j = 0; j < 720/w; ++j) {
 		x: w*i,
 		y: w*j,
 		theta: 3.14*Math.random(),
-		m: Math.random() > 0.5 ? 1 : 0
+		m: Math.random() > 0.5 ? 1 : -1
 	});
 }}
 /*
