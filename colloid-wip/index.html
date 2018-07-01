@@ -41,11 +41,7 @@ h2 { font-size: 18px; }
 
 .particle {
 	position: absolute;
-	/*border: 1px solid #000000;*/
-	background-color: #666;
-	width: 20px;
-	height: 20px;
-	border-radius: 16px;
+	border-radius: 100%;
 }
 .p-magnetic {
 	background-color: #f66;
@@ -62,14 +58,20 @@ h2 { font-size: 18px; }
 	<div id = "world" width = "720" height = "720"></div>
 	<script src = "../shared/v4.js"></script>
 	<script src = "../shared/spash.js"></script>
+	<script src = "../shared/hsv2hex.js"></script>
 	<script>
 const Particle = function (params) {
 	this.q = [ params.x, params.y, 0, 1 ];
 	this.q_prev = this.q.v4clone();
 	this.a = [ 0, 0, 0, 1 ];
 
+	this.neighbours = [];
+	this.order = 0;
+
 	this.m = params.m;
 }
+Particle.prototype.diameter = 17;
+Particle.prototype.margin = 2;
 Particle.prototype.integrate = function (dt) {
 	let old_q = this.q.v4clone();
 	this.q.v4mul(2).v4sub(this.q_prev)
@@ -87,9 +89,10 @@ Particle.prototype.integrate = function (dt) {
 Particle.prototype.initVisual = function (ref) {
 	const div = document.createElement("div");
 	div.classList.add("particle");
-	if (this.m > 0) {
-		div.classList.add("p-magnetic");
-	}
+	div.style.width = (this.diameter - this.margin) + 'px';
+	div.style.height = (this.diameter - this.margin) + 'px';
+	//div.style.border = this.margin + 'px solid #fff';
+		
 	ref.appendChild(div);
 
 	this.visual = div;
@@ -100,12 +103,18 @@ Particle.prototype.syncVisual = function () {
 
 	const c = 1;//Math.cos(this.theta);
 	const s = 0;//Math.sin(this.theta);
-	const w = 10;
+	const w = this.diameter/2;
 
 	div.style.transform = "matrix(" +
 	c + "," + (-s) + "," +
 	s + "," +   c  + "," +
 	(this.q[0]-w) + "," + (this.q[1]-w) + ")";
+
+	div.style.backgroundColor = HSVtoHex(
+		0.6,
+		//(0.6+0.4*this.q[0]/720+1)%1,
+		0.8,
+		Math.min(Math.max(0, 0.8+0.15*this.m), 1));
 }
 
 const Lab = function (params) {
@@ -113,11 +122,58 @@ const Lab = function (params) {
 	this.H = [ 0,
 		Math.sin(this.phi),
 		Math.cos(this.phi),
-		1].v4mul(4);
+		1].v4mul(4.5);
 	this.T = params.T;
 	this.particles = [];
 	this.ref = params.ref;
 	this.dt = 0.2;
+
+	this.sh = new Spash(720, 32);
+}
+Lab.prototype.updateHash = function () {
+	this.sh.empty();
+	for (let i = 0; i < this.particles.length; ++i) {
+		this.sh.insert(
+			this.particles[i].q[0],
+			this.particles[i].q[1],
+			i);
+	}
+
+	for (let i = 0; i < this.particles.length; ++i) {
+		this.particles[i].order = 0;
+	}
+	const thres = 1.5;
+	for (let i = 0; i < this.particles.length; ++i) {
+		const p = this.particles[i];
+		p.neighbours = this.sh.lookup(p.q[0], p.q[1]);
+
+		for (let j in p.neighbours) {
+			if (i < j) {
+				const d = v4sub(
+					p.q,
+					this.particles[j].q).v4mag()/
+					p.diameter;
+
+				if (d < thres) {
+					const inc = thres-d;
+					p.order += inc;
+					this.particles[j].order += inc;
+				}
+				/* calculate order diameter, to do */
+				//p.order += 1;
+				//this.particles[j].order += 1;
+			}
+		}
+	}
+
+	/* debug */
+	minord = 100;
+	maxord = 0;
+	for (let i = 0; i < this.particles.length; ++i) {
+		maxord = Math.max(maxord, this.particles[i].order);
+		minord = Math.min(minord, this.particles[i].order);
+	}
+	console.log(maxord, minord);
 }
 Lab.prototype.addParticle = function (params) {
 	const p = new Particle(params);
@@ -159,19 +215,8 @@ Lab.prototype.forces = function () {
 
 	}
 
-	let s = new Spash(720, 32);
-
 	for (let i = 0; i < this.particles.length; ++i) {
-		s.insert(
-			this.particles[i].q[0],
-			this.particles[i].q[1],
-			i);
-	}
-	for (let i = 0; i < this.particles.length; ++i) {
-		let nhb = s.lookup(
-			this.particles[i].q[0],
-			this.particles[i].q[1]);
-		for (let j in nhb) {
+		for (let j in this.particles[i].neighbours) {
 			if (i < j) {
 				dforces(
 				this.H,
@@ -195,7 +240,7 @@ Lab.prototype.constraints = function () {
 	function constrain (pa, pb) {
 		const u = v4sub(pb.q, pa.q);
 		const d = u.v4mag();
-		const offset = (20-d)/2;
+		const offset = (pa.diameter-d)/2;
 		if (offset <= 0) { return; }
 
 		pa.q.v4sub(v4mul(offset/d, u));
@@ -203,19 +248,8 @@ Lab.prototype.constraints = function () {
 
 	}
 
-	let s = new Spash(720, 20);
-
 	for (let i = 0; i < this.particles.length; ++i) {
-		s.insert(
-			this.particles[i].q[0],
-			this.particles[i].q[1],
-			i);
-	}
-	for (let i = 0; i < this.particles.length; ++i) {
-		let nhb = s.lookup(
-			this.particles[i].q[0],
-			this.particles[i].q[1]);
-		for (let j in nhb) {
+		for (let j in this.particles[i].neighbours) {
 			if (i < j) {
 				constrain(
 				this.particles[i],
@@ -246,6 +280,8 @@ Lab.prototype.render = function () {
 }
 Lab.prototype.timestep = function () {
 	window.requestAnimationFrame(this.timestep.bind(this));
+
+	this.updateHash();
 	this.forces();
 	this.integrate();	
 	this.constraints();
@@ -274,17 +310,17 @@ window.addEventListener('keydown', function (e) {
 	const phi_inc = Math.PI/12;
 	if (e.key === "ArrowLeft") {
 		l.phi = Math.min(Math.PI/2, l.phi + phi_inc);
-		l.H = [ 0, Math.sin(l.phi),	Math.cos(l.phi), 1].v4mul(4);
+		l.H = [ 0, Math.sin(l.phi),	Math.cos(l.phi), 1].v4mul(4.5);
 	}
 	if (e.key === "ArrowRight") {
 		l.phi = Math.max(0, l.phi - phi_inc);
-		l.H = [ 0, Math.sin(l.phi),	Math.cos(l.phi), 1].v4mul(4);
+		l.H = [ 0, Math.sin(l.phi),	Math.cos(l.phi), 1].v4mul(4.5);
 	}
 	console.log("T = " + l.T + "; H = " + l.H);
 });
 
 /* initial array of particles */
-const w = 24;
+const w = 22;
 for (let i = 0; i < 720/w; ++i) {
 for (let j = 0; j < 720/w; ++j) {
 	l.addParticle({
