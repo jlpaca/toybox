@@ -1,6 +1,7 @@
-function SpatialHash (cell_size, table_size)
+function SpatialHash (cell_size, table_size, margin)
 {
 	this.k = cell_size | 120;
+	this.margin = margin | 4;
 
 	this.m = table_size | 8191;
 	this.table = [];
@@ -28,8 +29,9 @@ SpatialHash.prototype.insert = function (x, y, obj)
 SpatialHash.prototype.query = function (x, y) {
 	let ret = new Set();
 
-	let dx = [ 0, 0,  0, 1, 1,  1, -1, -1, -1 ];
-	let dy = [ 0, 1, -1, 0, 1, -1,  0,  1, -1 ];
+	const m = this.margin;
+	let dx = [ 0, 0,  0, m, m,  m, -m, -m, -m ];
+	let dy = [ 0, m, -m, 0, m, -m,  0,  m, -m ];
 	for (let i = 0; i < 9; ++i) {
 		let h = this.hash(x+dx[i], y+dy[i]);
 		let r = this.table[h];

@@ -43,9 +43,9 @@ h2 { font-size: 18px; }
 	position: absolute;
 	/*border: 1px solid #000000;*/
 	background-color: #666;
-	width: 8px;
-	height: 8px;
-	border-radius: 4px;
+	width: 16px;
+	height: 16px;
+	border-radius: 16px;
 }
 .p-magnetic {
 	background-color: #f66;
@@ -96,7 +96,7 @@ Particle.prototype.syncVisual = function () {
 
 	const c = 1;//Math.cos(this.theta);
 	const s = 0;//Math.sin(this.theta);
-	const w = 4;
+	const w = 8;
 
 	div.style.transform = "matrix(" +
 	c + "," + (-s) + "," +
@@ -106,9 +106,10 @@ Particle.prototype.syncVisual = function () {
 
 const Lab = function (params) {
 	this.H = params.H;
+	this.T = params.T;
 	this.particles = [];
 	this.ref = params.ref;
-	this.dt = 0.1;
+	this.dt = 0.2;
 }
 Lab.prototype.addParticle = function (params) {
 	const p = new Particle(params);
@@ -124,7 +125,7 @@ Lab.prototype.forces = function () {
 	for (let i = 0; i < this.particles.length; ++i) {
 		const th = Math.random()*Math.PI*2;
 		this.particles[i].a =
-			[ Math.cos(th), Math.sin(th), 0, 1];
+			[ this.T*Math.cos(th), this.T*Math.sin(th), 0, 1];
 	}
 	/* dipole-dipole */
 	function dforces (H, pa, pb) {
@@ -143,11 +144,35 @@ Lab.prototype.forces = function () {
 			5*v4dot(ma, r)*v4dot(mb, r)/d/d,
 			r)));
 
+		F[2] = 0;
 		pa.a.v4sub(F);
 		pb.a.v4add(F);
 
 	}
 
+	let s = new Spash(720, 32);
+
+	for (let i = 0; i < this.particles.length; ++i) {
+		s.insert(
+			this.particles[i].q[0],
+			this.particles[i].q[1],
+			i);
+	}
+	for (let i = 0; i < this.particles.length; ++i) {
+		let nhb = s.lookup(
+			this.particles[i].q[0],
+			this.particles[i].q[1]);
+		for (let j in nhb) {
+			if (i < j) {
+				dforces(
+				this.H,
+				this.particles[i],
+				this.particles[j]);
+			}
+		}
+	}
+
+	/*
 	for (let i = 0; i < this.particles.length; ++i) {
 	for (let j = i+1; j < this.particles.length; ++j) {
 		dforces(
@@ -155,12 +180,13 @@ Lab.prototype.forces = function () {
 			this.particles[i],
 			this.particles[j]);
 	}}
+	*/
 }
 Lab.prototype.constraints = function () {
 	function constrain (pa, pb) {
 		const u = v4sub(pb.q, pa.q);
 		const d = u.v4mag();
-		const offset = (8-d)/2;
+		const offset = (16-d)/2;
 		if (offset <= 0) { return; }
 
 		pa.q.v4sub(v4mul(offset/d, u));
@@ -168,13 +194,35 @@ Lab.prototype.constraints = function () {
 
 	}
 
+	let s = new Spash(720, 16);
+
+	for (let i = 0; i < this.particles.length; ++i) {
+		s.insert(
+			this.particles[i].q[0],
+			this.particles[i].q[1],
+			i);
+	}
+	for (let i = 0; i < this.particles.length; ++i) {
+		let nhb = s.lookup(
+			this.particles[i].q[0],
+			this.particles[i].q[1]);
+		for (let j in nhb) {
+			if (i < j) {
+				constrain(
+				this.particles[i],
+				this.particles[j]);
+			}
+		}
+	}
+
+	/*
 	for (let i = 0; i < this.particles.length; ++i) {
 	for (let j = i+1; j < this.particles.length; ++j) {
 		constrain(
 			this.particles[i],
 			this.particles[j]);
 	}}
-
+	*/
 }
 
 Lab.prototype.integrate = function () {
@@ -192,6 +240,7 @@ Lab.prototype.timestep = function () {
 	this.forces();
 	this.integrate();	
 	this.constraints();
+	this.constraints();
 	this.render();
 }
 
@@ -199,9 +248,10 @@ Lab.prototype.timestep = function () {
 
 const l = new Lab({
 	ref: document.getElementById("world"),
-	H: [ 0, 0, 1, 1 ]
+	H: [ 0, 0, 2, 1 ],
+	T: 1
 });
-const w = 15;
+const w = 20;
 for (let i = 0; i < 720/w; ++i) {
 for (let j = 0; j < 720/w; ++j) {
 	l.addParticle({
@@ -211,20 +261,6 @@ for (let j = 0; j < 720/w; ++j) {
 		m: Math.random() > 0.5 ? 1 : -1
 	});
 }}
-/*
-l.addParticle({
-	x: 300,
-	y: 400,
-	theta: 0,
-	m: 1
-});
-l.addParticle({
-	x: 300,
-	y: 500,
-	theta: 0,
-	m: 1
-});
-*/
 l.timestep();
 
 	</script>	
