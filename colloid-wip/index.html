@@ -5,7 +5,7 @@
 <style>
 html, body {
 	margin: 0; padding: 0;
-	background-color: #fff;
+	background-color: #f0f0ff;
 	color: #999;
 
 	font-family: 'open sans', sans-serif;
@@ -27,6 +27,7 @@ h2 { font-size: 18px; }
 /* WORLD*/
 
 #world {
+	background-color: #efeffa;
 	border: 1px #ccc none;/*dashed;*/
 
 	margin: 4px auto;
@@ -83,8 +84,10 @@ Particle.prototype.integrate = function (dt) {
 	this.q_prev = old_q;
 
 	/* ad-hoc clamp */
-	this.q[0] = Math.max(0, Math.min(this.q[0], 720));
-	this.q[1] = Math.max(0, Math.min(this.q[1], 720));
+	this.q[0] = Math.max(this.diameter/2,
+		Math.min(this.q[0], 720-this.diameter/2));
+	this.q[1] = Math.max(this.diameter/2,
+		Math.min(this.q[1], 720-this.diameter/2));
 }
 Particle.prototype.initVisual = function (ref) {
 	const div = document.createElement("div");
@@ -110,11 +113,12 @@ Particle.prototype.syncVisual = function () {
 	s + "," +   c  + "," +
 	(this.q[0]-w) + "," + (this.q[1]-w) + ")";
 
-	div.style.backgroundColor = HSVtoHex(
-		0.6,
-		//(0.6+0.4*this.q[0]/720+1)%1,
-		0.8,
-		Math.min(Math.max(0, 0.8+0.15*this.m), 1));
+	const t = Math.max(0, 1-this.order);
+
+	div.style.backgroundColor = 'rgb(' +
+	Math.max(0, Math.min(64 + 6*this.m + 10*t, 100)) + '%,' +
+	Math.max(0, Math.min(64 + 6*this.m - 60*t, 100)) + '%,' +
+	Math.max(0, Math.min(64 + 6*this.m - 80*t, 100)) + '%)';
 }
 
 const Lab = function (params) {
@@ -140,40 +144,34 @@ Lab.prototype.updateHash = function () {
 	}
 
 	for (let i = 0; i < this.particles.length; ++i) {
-		this.particles[i].order = 0;
+		this.particles[i].order = -Math.log2(this.T+1)/8;
 	}
-	const thres = 1.5;
+	const thres = 1.4;
 	for (let i = 0; i < this.particles.length; ++i) {
-		const p = this.particles[i];
-		p.neighbours = this.sh.lookup(p.q[0], p.q[1]);
+		const pa = this.particles[i];
+		pa.neighbours = this.sh.lookup(pa.q[0], pa.q[1]);
 
-		for (let j in p.neighbours) {
-			if (i < j) {
-				const d = v4sub(
-					p.q,
-					this.particles[j].q).v4mag()/
-					p.diameter;
-
-				if (d < thres) {
-					const inc = thres-d;
-					p.order += inc;
-					this.particles[j].order += inc;
-				}
-				/* calculate order diameter, to do */
-				//p.order += 1;
-				//this.particles[j].order += 1;
-			}
+		for (let j in pa.neighbours) {
+			const pb = this.particles[j];
+			const d = v4sub(pb.q, pa.q).v4mag()/
+				Particle.prototype.diameter;
+			if (i < j && d < thres) {
+				pa.order += thres-d;
+				pb.order += thres-d;
+			}			
 		}
 	}
 
 	/* debug */
 	minord = 100;
 	maxord = 0;
+	avgord = 0;
 	for (let i = 0; i < this.particles.length; ++i) {
 		maxord = Math.max(maxord, this.particles[i].order);
 		minord = Math.min(minord, this.particles[i].order);
+		avgord += this.particles[i].order;
 	}
-	console.log(maxord, minord);
+	console.log(maxord, minord, avgord/this.particles.length);
 }
 Lab.prototype.addParticle = function (params) {
 	const p = new Particle(params);
@@ -320,12 +318,13 @@ window.addEventListener('keydown', function (e) {
 });
 
 /* initial array of particles */
-const w = 22;
-for (let i = 0; i < 720/w; ++i) {
-for (let j = 0; j < 720/w; ++j) {
+const N = 32;
+const w = 720/N;
+for (let i = 0; i < N; ++i) {
+for (let j = 0; j < N; ++j) {
 	l.addParticle({
-		x: w*i,
-		y: w*j,
+		x: w*(i+0.5),
+		y: w*(j+0.5),
 		theta: 3.14*Math.random(),
 		m: Math.random() > 0.5 ? 1 : -1
 	});

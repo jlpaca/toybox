@@ -17,7 +17,7 @@ Spash.prototype = {
 		this.table[t].push(i);
 	},
 	lookup: function(x, y, i){
-		var neighbour = [];
+		var neighbour = {};
 		var di = 0; var dj = 0;
 		for (var di = -1; di < 2; di += 1) {
 		for (var dj = -1; dj < 2; dj += 1) {
