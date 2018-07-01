@@ -1,66 +1,3 @@
-<!DOCTYPE HTML>
-<html>
-<head>
-<link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
-<style>
-html, body {
-	margin: 0; padding: 0;
-	background-color: #f0f0ff;
-	color: #999;
-
-	font-family: 'open sans', sans-serif;
-	font-size: 14px;
-}
-h2 { font-size: 18px; }
-
-/*UI*/
-
-#container {
-	width: 720px;
-	margin: 4px auto;
-}
-#credits{
-	margin-top: 16px;
-	font-size: 12px;
-}
-
-/* WORLD*/
-
-#world {
-	background-color: #efeffa;
-	border: 1px #ccc none;/*dashed;*/
-
-	margin: 4px auto;
-
-	position: relative;
-
-	width: 720px;
-	height: 720px;
-
-	overflow: hidden;
-}
-
-.particle {
-	position: absolute;
-	border-radius: 100%;
-}
-.p-magnetic {
-	background-color: #f66;
-}
-
-</style>
-
-</head>
-<body>
-
-<div id = "container">
-	<h2>TITLE</h2>
-
-	<div id = "world" width = "720" height = "720"></div>
-	<script src = "../shared/v4.js"></script>
-	<script src = "../shared/spash.js"></script>
-	<script src = "../shared/hsv2hex.js"></script>
-	<script>
 const Particle = function (params) {
 	this.q = [ params.x, params.y, 0, 1 ];
 	this.q_prev = this.q.v4clone();
@@ -71,7 +8,7 @@ const Particle = function (params) {
 
 	this.m = params.m;
 }
-Particle.prototype.diameter = 17;
+Particle.prototype.diameter = 16;
 Particle.prototype.margin = 2;
 Particle.prototype.integrate = function (dt) {
 	let old_q = this.q.v4clone();
@@ -318,7 +255,7 @@ window.addEventListener('keydown', function (e) {
 });
 
 /* initial array of particles */
-const N = 32;
+const N = 36;
 const w = 720/N;
 for (let i = 0; i < N; ++i) {
 for (let j = 0; j < N; ++j) {
@@ -330,15 +267,3 @@ for (let j = 0; j < N; ++j) {
 	});
 }}
 l.timestep();
-
-	</script>	
-	<div><p>description.</p></div>
-
-	<div id = "credits">
-	J. Lo, [M] [yyyy].
-	</div>
-
-</div>
-
-</body>
-</html>
