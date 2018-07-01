@@ -43,8 +43,8 @@ h2 { font-size: 18px; }
 	position: absolute;
 	/*border: 1px solid #000000;*/
 	background-color: #666;
-	width: 16px;
-	height: 16px;
+	width: 20px;
+	height: 20px;
 	border-radius: 16px;
 }
 .p-magnetic {
@@ -74,6 +74,10 @@ Particle.prototype.integrate = function (dt) {
 	let old_q = this.q.v4clone();
 	this.q.v4mul(2).v4sub(this.q_prev)
 		.v4add(this.a.v4mul(dt*dt/2));
+	
+	/* damp */
+	const damping = 0.01;
+	this.q.v4mul(1-damping).v4add(v4mul(damping, old_q));
 	this.q_prev = old_q;
 
 	/* ad-hoc clamp */
@@ -96,7 +100,7 @@ Particle.prototype.syncVisual = function () {
 
 	const c = 1;//Math.cos(this.theta);
 	const s = 0;//Math.sin(this.theta);
-	const w = 8;
+	const w = 10;
 
 	div.style.transform = "matrix(" +
 	c + "," + (-s) + "," +
@@ -105,7 +109,11 @@ Particle.prototype.syncVisual = function () {
 }
 
 const Lab = function (params) {
-	this.H = params.H;
+	this.phi = params.phi;
+	this.H = [ 0,
+		Math.sin(this.phi),
+		Math.cos(this.phi),
+		1].v4mul(4);
 	this.T = params.T;
 	this.particles = [];
 	this.ref = params.ref;
@@ -133,6 +141,7 @@ Lab.prototype.forces = function () {
 		const mb = v4mul(pb.m, H);
 		const r = v4sub(pb.q, pa.q);
 		const d = v4mag(r);
+		if (d > 32) { return; }
 
 		const c = 1e4;
 		
@@ -186,7 +195,7 @@ Lab.prototype.constraints = function () {
 	function constrain (pa, pb) {
 		const u = v4sub(pb.q, pa.q);
 		const d = u.v4mag();
-		const offset = (16-d)/2;
+		const offset = (20-d)/2;
 		if (offset <= 0) { return; }
 
 		pa.q.v4sub(v4mul(offset/d, u));
@@ -194,7 +203,7 @@ Lab.prototype.constraints = function () {
 
 	}
 
-	let s = new Spash(720, 16);
+	let s = new Spash(720, 20);
 
 	for (let i = 0; i < this.particles.length; ++i) {
 		s.insert(
@@ -248,10 +257,34 @@ Lab.prototype.timestep = function () {
 
 const l = new Lab({
 	ref: document.getElementById("world"),
-	H: [ 0, 0, 2, 1 ],
-	T: 1
+	phi: 0,
+	T: 2
 });
-const w = 20;
+
+window.addEventListener('keydown', function (e) {
+	/* control temperature */
+	if (e.key === "ArrowUp") {
+		l.T = l.T ? Math.min(32, l.T *= 2) : 1;
+	}
+	if (e.key === "ArrowDown") {
+		l.T = Math.floor(l.T/2);
+	}
+
+	/* control magnetic field direction */
+	const phi_inc = Math.PI/12;
+	if (e.key === "ArrowLeft") {
+		l.phi = Math.min(Math.PI/2, l.phi + phi_inc);
+		l.H = [ 0, Math.sin(l.phi),	Math.cos(l.phi), 1].v4mul(4);
+	}
+	if (e.key === "ArrowRight") {
+		l.phi = Math.max(0, l.phi - phi_inc);
+		l.H = [ 0, Math.sin(l.phi),	Math.cos(l.phi), 1].v4mul(4);
+	}
+	console.log("T = " + l.T + "; H = " + l.H);
+});
+
+/* initial array of particles */
+const w = 24;
 for (let i = 0; i < 720/w; ++i) {
 for (let j = 0; j < 720/w; ++j) {
 	l.addParticle({
