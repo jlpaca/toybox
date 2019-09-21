@@ -1,0 +1,346 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <link href = 'https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel = 'stylesheet' type = 'text/css'>
+    <style>
+      html, body {
+	  margin: 0; padding: 0;
+	  background-color: #fff;
+	  color: #999;
+
+	  font-family: 'open sans', sans-serif;
+	  font-size: 14px;
+      }
+      h2 { font-size: 18px; }
+
+      /*UI*/
+
+      #container {
+	  width: 720px;
+	  margin: 4px auto;
+      }
+      #credits{
+	  margin-top: 16px;
+	  font-size: 12px;
+      }
+
+      /* WORLD*/
+
+      #world {
+	  border: 1px #ccc none;/*dashed;*/
+
+	  margin: 4px auto;
+
+	  position: relative;
+
+	  width: 720px;
+	  height: 720px;
+
+	  /*overflow: hidden;*/
+      }
+
+    </style>
+    
+    <script id = "v-quad" type = "text/glsl">#version 300 es
+    in vec2 x; void main() { gl_Position = vec4(x, 0., 1.); }
+    </script>
+
+    <!-- rendering particles -->
+    <script id = "v-p-part" type = "text/glsl">#version 300 es
+    in vec2 ij;
+      uniform sampler2D p;
+
+      out float st;
+      
+      void main() {
+	  vec4 part = texelFetch(p, ivec2(ij), 0);
+	  vec2 xy = part.xy;
+	  st = part.a;
+	  
+	  gl_PointSize = 2.;
+	  gl_Position = vec4(xy*2.-1., 0., 1.);
+      }
+    </script>
+
+    <script id = "f-p-part" type = "text/glsl">#version 300 es
+      precision mediump float;
+      
+      uniform sampler2D f;
+
+      const float deposit = 0.1;
+      
+    in float st;
+      out vec4 fragc;
+      
+      void main () {
+	  vec4 prev = texture(f, gl_FragCoord.xy/720.);
+
+	  /* make particle location transparent for debugging. */
+	  fragc = vec4(prev.rgb, 0.) + vec4(deposit, 0., 0., 0.)*st;
+      }
+    </script>
+
+    <!-- timestepping particles -->
+    <script id = "f-p-data" type = "text/glsl">#version 300 es
+#define PI 3.1415926536
+
+      precision mediump float;
+
+      const float TAU = 2.*PI;
+      
+      uniform sampler2D p;
+      uniform sampler2D f;
+      uniform float t;
+      
+      out vec4 fragc;
+
+      const float v = 1./720.;
+
+      const float ang = 0.125; /* sensory angle */
+      const float trn = 0.125; /* turning angle */
+      const float off = 18./720.; /* sensory offset */
+
+      float rand(vec2 co){
+	  return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * (43758.5453+t));
+      }
+      
+      void main () {
+	  vec4 part = texelFetch(p, ivec2(gl_FragCoord.xy), 0);
+	  vec4 prev = texture(f, part.xy);
+	  
+	  vec2 xy = part.xy;
+	  float th = part.z;
+	  float st = part.a;
+
+	  /* sense surroundings */
+	  float ff = texture(f, xy+off*vec2(cos((th    )*TAU), sin((th    )*TAU))).r;
+	  float fl = texture(f, xy+off*vec2(cos((th+ang)*TAU), sin((th+ang)*TAU))).r;
+	  float fr = texture(f, xy+off*vec2(cos((th-ang)*TAU), sin((th-ang)*TAU))).r;
+
+	  /*
+	  if (ff > fl && ff > fr) {
+
+	  } else if (fl > fr) {
+	      th += trn;
+	  } else if (fr > fl) {
+	      th -= trn;
+	  }
+	  */
+	  
+	  th += trn * (fl-fr)/(fl+fr+ff+1e-6)*2.;
+	  
+	  vec2 dxy = vec2(cos(th*TAU), sin(th*TAU))*v;
+	  
+	  /* update */
+	  float attempt = sign(texture(f, xy+dxy).a);
+	  xy = mix(xy,           fract(xy+dxy), attempt);
+	  th = mix(rand(xy+dxy), fract(th),     attempt);
+	  st = mix(0.,           1.,            attempt);
+
+	  fragc = vec4(xy, th, st);
+      }
+    </script>
+
+    <!-- timestepping for background field -->
+    <script id = "f-f-data" type = "text/glsl">#version 300 es
+      precision mediump float;
+
+      uniform sampler2D f;
+      out vec4 fragc;
+
+      const float diff = 0.05;
+      const float evap = 0.005;
+      
+      const vec2[4] dxy = vec2[4](
+	  vec2(1., 0.), vec2(0., 1.), vec2(-1., 0.), vec2(0., -1)
+      );
+      
+      void main () {
+	  vec4 prev = texture(f, gl_FragCoord.xy/720.);
+
+	  /* naïve diffusion */
+	  float ph = prev.r;
+	  for (int i = 0; i < 4; ++i) {
+	      ph += diff * (texture(f, (gl_FragCoord.xy+dxy[i])/720.).r - prev.r);
+	  }
+	  ph = mix(ph, 0., evap);
+	  
+	  fragc = vec4(ph, 0., 0., 1.);
+      }
+    </script>
+
+    <!-- actual output
+    <script id = "f-f-img" type = "text/glsl">#version 300 es
+      precision mediump float;
+
+      uniform sampler2D tex;
+      out vec4 fragc;
+      
+      void main () {
+	  fragc = vec4(1., 0., 1., 1.);
+      }
+    </script>
+    -->
+
+  </head>
+  <body>
+
+    <div id = "container">
+      <h2>TITLE</h2>
+
+      <canvas id = "world" width = "720" height = "720"></canvas>
+      
+      <div><p>description.</p></div>
+      <script src = "../shared/gl2.js"></script>
+      <script>
+
+	const canv = document.getElementById("world");
+	const gl = canv.getContext("webgl2");
+
+	if (!gl) {
+	    throw "error: webgl2 not supported.";
+	}
+	const ext = gl.getExtension("EXT_color_buffer_float");
+	if (!ext) {
+	    throw "error: rendering to float texture not supported.";
+	}
+
+
+	const W = 720; /* W-by-W canvas */
+	const M = 64; /* M^2 particles */
+	
+	const vquad = makeShader(gl, document.getElementById("v-quad").text, gl.VERTEX_SHADER);
+	
+	const fpdata = makeShader(gl, document.getElementById("f-p-data").text, gl.FRAGMENT_SHADER);
+	const ffdata = makeShader(gl, document.getElementById("f-f-data").text, gl.FRAGMENT_SHADER);
+
+	const vppart = makeShader(gl, document.getElementById("v-p-part").text, gl.VERTEX_SHADER);
+	const fppart = makeShader(gl, document.getElementById("f-p-part").text, gl.FRAGMENT_SHADER);
+
+	/* quad vertices */
+	const x = new Float32Array([1, 1, 1, -1, -1, 1, -1, -1]);
+	const xbuf = makeBuffer(gl, x, gl.STATIC_DRAW);
+
+	/* vertex hashmap */
+	const ij = new Float32Array(2*M*M);
+	for (let i = 0; i < M; ++i) {
+	    for (let j = 0; j < M; ++j) {
+		ij[2*(i*M+j)  ] = i;
+		ij[2*(i*M+j)+1] = j;
+	    }
+	}
+	const ijbuf = makeBuffer(gl, ij, gl.STATIC_DRAW);
+	
+	/* program for timestepping the particles */
+	const ppdata = makeProgram(gl, vquad, fpdata);
+
+	const ppdxloc = gl.getAttribLocation(ppdata, "x");
+	const ppdfloc = gl.getUniformLocation(ppdata, "f");
+	const ppdploc = gl.getUniformLocation(ppdata, "p");
+	const ppdtloc = gl.getUniformLocation(ppdata, "t");
+
+	
+	/* program for timestepping the field */
+	const pfdata = makeProgram(gl, vquad, ffdata);
+
+	const pfdxloc = gl.getAttribLocation(pfdata, "x");
+	const pfdfloc = gl.getUniformLocation(pfdata, "f");
+
+	/* program for rendering particles onto field */
+	const pppart = makeProgram(gl, vppart, fppart);
+	const pppijloc = gl.getAttribLocation(pppart, "ij");
+	const pppfloc = gl.getUniformLocation(pppart, "f");
+	const pppploc = gl.getUniformLocation(pppart, "p");
+	
+	/* two textures / framebuffers for ping-ponging the field */
+	const texadata = new Uint8Array(W*W*4);
+	for (let i = 0; i < W; ++i) {
+	    for (let j = 0; j < W; ++j) {
+		texadata[4*(W*i+j)  ] = 0; /* trail */
+		texadata[4*(W*i+j)+1] = 0;
+		texadata[4*(W*i+j)+2] = 0;
+		texadata[4*(W*i+j)+3] = 0; /* cell available: 0 / 1 */
+	    }
+	}
+	const texa = makeTexture(gl, 0, gl.RGBA, W, W, gl.RGBA, gl.UNSIGNED_BYTE,
+				 texadata, gl.LINEAR, gl.LINEAR, gl.REPEAT, gl.REPEAT);
+	const fbfa = makeFramebuffer(gl, texa, 0);
+	
+	const texb = makeTexture(gl, 1, gl.RGBA, W, W, gl.RGBA, gl.UNSIGNED_BYTE,
+				 null, gl.LINEAR, gl.LINEAR, gl.REPEAT, gl.REPEAT);
+	const fbfb = makeFramebuffer(gl, texb, 1);
+
+	/* two textures / framebuffers for ping-ponging the particle data */
+	const texpdata = new Float32Array(M*M*4);
+	for (let i = 0; i < M*M; ++i) {
+	    /*
+	    let th = Math.random()*2*Math.PI;
+	    let r = Math.sqrt(Math.random())*0.2; // for uniform-ish distribution.
+	    
+	    texpdata[4*i  ] = .5+Math.cos(th)*r; // location x
+	    texpdata[4*i+1] = .5+Math.sin(th)*r; // location y
+	    */
+	    texpdata[4*i  ] = Math.random();
+	    texpdata[4*i+1] = Math.random();
+	    
+	    texpdata[4*i+2] = Math.random();      /* direction  */
+	    texpdata[4*i+3] = 1;                  /* state      */
+	}
+	const texp = makeTexture(gl, 2, gl.RGBA32F, M, M, gl.RGBA, gl.FLOAT,
+				 texpdata, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT);
+	const fbfp = makeFramebuffer(gl, texp, 2);
+	
+	const texq = makeTexture(gl, 3, gl.RGBA32F, M, M, gl.RGBA, gl.FLOAT,
+				 null, gl.NEAREST, gl.NEAREST, gl.REPEAT, gl.REPEAT);
+	const fbfq = makeFramebuffer(gl, texq, 3);
+	
+
+
+	let ping = true; /* reading from a/p, rendering to b/q */
+	let t = 0;
+	const dt = 0.1;
+	const T = 1;
+	
+	function timestep () {
+	    window.requestAnimationFrame(timestep);
+
+	    /* timestep background field */
+	    setBuffer(gl, pfdata, pfdxloc, xbuf, 2, gl.FLOAT);
+	    setUniform(gl, null, pfdfloc, "1i", ping ? 0 : 1);
+	    render(gl, null, ping ? fbfb : fbfa, gl.TRIANGLE_STRIP, 0, 4);
+	    render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
+
+	    /*timestep particles */
+   	    setBuffer(gl, ppdata, ppdxloc, xbuf, 2, gl.FLOAT);
+	    setUniform(gl, null, ppdfloc, "1i", ping ? 0 : 1);
+   	    setUniform(gl, null, ppdploc, "1i", ping ? 2 : 3);
+   	    setUniform(gl, null, ppdtloc, "1f", t);
+
+	    render(gl, null, ping ? fbfq : fbfp, gl.TRIANGLE_STRIP, 0, 4);
+	    //render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
+
+	    /* render points */
+	    setBuffer(gl, pppart, pppijloc, ijbuf, 2, gl.FLOAT);
+	    setUniform(gl, null, pppfloc, "1i", ping ? 0 : 1);
+	    setUniform(gl, null, pppploc, "1i", ping ? 2 : 3);
+
+	    render(gl, null, ping ? fbfb : fbfa, gl.POINTS, 0, M*M);
+	    render(gl, null, null, gl.POINTS, 0, M*M);
+	    
+	    ping = !ping;
+
+	    t += dt;
+	    t = (t > T ? t - T : t);
+	}
+
+	timestep();
+	
+      </script>
+      <div id = "credits">
+	J. Lo, [M] [yyyy].
+      </div>
+
+    </div>
+
+  </body>
+</html>
