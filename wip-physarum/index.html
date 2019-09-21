@@ -234,26 +234,23 @@
 	
 	/* program for timestepping the particles */
 	const ppdata = makeProgram(gl, vquad, fpdata);
-
 	const ppdxloc = gl.getAttribLocation(ppdata, "x");
-	const ppdfloc = gl.getUniformLocation(ppdata, "f");
-	const ppdploc = gl.getUniformLocation(ppdata, "p");
 
-	const ppdtloc = gl.getUniformLocation(ppdata, "t");
-
-	const ppdoffloc = gl.getUniformLocation(ppdata, "off");
-	const ppdangloc = gl.getUniformLocation(ppdata, "ang");
-	const ppdtrnloc = gl.getUniformLocation(ppdata, "trn");
-
+	uniforms.ppdata = ["f", "p", "t", "off", "ang", "trn"].map((name, i) => ({
+	    name: name,
+	    location: gl.getUniformLocation(ppdata, name),
+	    type: i < 2 ? "1i" : "1f"
+	}))
 	
 	/* program for timestepping the field */
 	const pfdata = makeProgram(gl, vquad, ffdata);
-
 	const pfdxloc = gl.getAttribLocation(pfdata, "x");
-	const pfdfloc = gl.getUniformLocation(pfdata, "f");
 
-	const pfdevaploc = gl.getUniformLocation(pfdata, "evap");
-	const pfddiffloc = gl.getUniformLocation(pfdata, "diff");
+	uniforms.pfdata = ["f", "evap", "diff"].map((name, i) => ({
+	    name: name,
+	    location: gl.getUniformLocation(pfdata, name),
+	    type: i < 1 ? "1i" : "1f"
+	}));
 	
 	/* program for rendering particles onto field */
 	const pppart = makeProgram(gl, vppart, fppart);
@@ -283,13 +280,6 @@
 	/* two textures / framebuffers for ping-ponging the particle data */
 	const texpdata = new Float32Array(M*M*4);
 	for (let i = 0; i < M*M; ++i) {
-	    /*
-	    let th = Math.random()*2*Math.PI;
-	    let r = Math.sqrt(Math.random())*0.2; // for uniform-ish distribution.
-	    
-	    texpdata[4*i  ] = .5+Math.cos(th)*r; // location x
-	    texpdata[4*i+1] = .5+Math.sin(th)*r; // location y
-	    */
 	    texpdata[4*i  ] = Math.random();
 	    texpdata[4*i+1] = Math.random();
 	    
@@ -309,42 +299,51 @@
 	let ping = true; /* reading from a/p, rendering to b/q */
 
 	/* system time */
-	let t = 0;
 	const dt = 0.1;
 	const T = 1;
 
 	/* diffusion & evaporation parameters */
-	let evap = 0.005;
-	let diff = 0.05;
+	const fu = {
+	    f: 0,
+	    evap: 0.005,
+	    diff: 0.05
+	};
 
 	/* agent behaviour parameters */
-	let off = 18/720; // sensory offset
-	let ang = 0.125;  // sensory angle
-	let trn = 0.125;  // turn angle
+	const pu = {
+	    p: 2,
+	    f: 0,
+	    t: 0,
+	    off: 18/720, // sensory offset
+	    ang: 0.125,  // sensory angle
+	    trn: 0.125,  // turn angle
+	};
 	
 	function timestep () {
 	    window.requestAnimationFrame(timestep);
 
 	    /* timestep background field */
 	    setBuffer(gl, pfdata, pfdxloc, xbuf, 2, gl.FLOAT);
-	    setUniform(gl, null, pfdfloc, "1i", ping ? 0 : 1);
 
-      	    setUniform(gl, null, pfdevaploc, "1f", evap);
-    	    setUniform(gl, null, pfddiffloc, "1f", diff);
+	    fu.f = ping ? 0 : 1;
 
+	    uniforms.pfdata.map((u) => {
+		setUniform(gl, null, u.location, u.type, fu[u.name]);
+	    });
 
 	    render(gl, null, ping ? fbfb : fbfa, gl.TRIANGLE_STRIP, 0, 4);
 	    render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
 
 	    /*timestep particles */
    	    setBuffer(gl, ppdata, ppdxloc, xbuf, 2, gl.FLOAT);
-	    setUniform(gl, null, ppdfloc, "1i", ping ? 0 : 1);
-   	    setUniform(gl, null, ppdploc, "1i", ping ? 2 : 3);
 
-   	    setUniform(gl, null, ppdtloc, "1f", t);
-	    setUniform(gl, null, ppdoffloc, "1f", off);
-	    setUniform(gl, null, ppdangloc, "1f", ang);
-	    setUniform(gl, null, ppdtrnloc, "1f", trn);
+	    pu.p = ping ? 2 : 3;
+	    pu.f = ping ? 0 : 1;
+	    pu.t = pu.t + dt - (pu.t > T ? T : 0);
+	    
+	    uniforms.ppdata.map((u) => {
+		setUniform(gl, null, u.location, u.type, pu[u.name]);
+	    });
 
 	    render(gl, null, ping ? fbfq : fbfp, gl.TRIANGLE_STRIP, 0, 4);
 	    //render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
@@ -359,8 +358,6 @@
 	    
 	    ping = !ping;
 
-	    t += dt;
-	    t = (t > T ? t - T : t);
 	}
 
 	timestep();
