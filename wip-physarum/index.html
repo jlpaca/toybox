@@ -96,10 +96,10 @@
 
       const float v = 1./720.;
 
-      const float ang = 0.125; /* sensory angle */
-      const float trn = 0.125; /* turning angle */
-      const float off = 18./720.; /* sensory offset */
-
+      uniform float off; /* sensory offset */
+      uniform float ang; /* sensory angle */
+      uniform float trn; /* turning angle */
+      
       float rand(vec2 co){
 	  return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * (43758.5453+t));
       }
@@ -148,8 +148,8 @@
       uniform sampler2D f;
       out vec4 fragc;
 
-      const float diff = 0.05;
-      const float evap = 0.005;
+      uniform float diff;
+      uniform float evap;
       
       const vec2[4] dxy = vec2[4](
 	  vec2(1., 0.), vec2(0., 1.), vec2(-1., 0.), vec2(0., -1)
@@ -169,18 +169,17 @@
       }
     </script>
 
-    <!-- actual output
+    <!-- actual output -->
     <script id = "f-f-img" type = "text/glsl">#version 300 es
       precision mediump float;
 
-      uniform sampler2D tex;
+      uniform sampler2D f;
       out vec4 fragc;
       
       void main () {
 	  fragc = vec4(1., 0., 1., 1.);
       }
     </script>
-    -->
 
   </head>
   <body>
@@ -230,6 +229,8 @@
 	    }
 	}
 	const ijbuf = makeBuffer(gl, ij, gl.STATIC_DRAW);
+
+	const uniforms = {};
 	
 	/* program for timestepping the particles */
 	const ppdata = makeProgram(gl, vquad, fpdata);
@@ -237,7 +238,12 @@
 	const ppdxloc = gl.getAttribLocation(ppdata, "x");
 	const ppdfloc = gl.getUniformLocation(ppdata, "f");
 	const ppdploc = gl.getUniformLocation(ppdata, "p");
+
 	const ppdtloc = gl.getUniformLocation(ppdata, "t");
+
+	const ppdoffloc = gl.getUniformLocation(ppdata, "off");
+	const ppdangloc = gl.getUniformLocation(ppdata, "ang");
+	const ppdtrnloc = gl.getUniformLocation(ppdata, "trn");
 
 	
 	/* program for timestepping the field */
@@ -246,11 +252,15 @@
 	const pfdxloc = gl.getAttribLocation(pfdata, "x");
 	const pfdfloc = gl.getUniformLocation(pfdata, "f");
 
+	const pfdevaploc = gl.getUniformLocation(pfdata, "evap");
+	const pfddiffloc = gl.getUniformLocation(pfdata, "diff");
+	
 	/* program for rendering particles onto field */
 	const pppart = makeProgram(gl, vppart, fppart);
 	const pppijloc = gl.getAttribLocation(pppart, "ij");
 	const pppfloc = gl.getUniformLocation(pppart, "f");
 	const pppploc = gl.getUniformLocation(pppart, "p");
+	
 	
 	/* two textures / framebuffers for ping-ponging the field */
 	const texadata = new Uint8Array(W*W*4);
@@ -297,9 +307,20 @@
 
 
 	let ping = true; /* reading from a/p, rendering to b/q */
+
+	/* system time */
 	let t = 0;
 	const dt = 0.1;
 	const T = 1;
+
+	/* diffusion & evaporation parameters */
+	let evap = 0.005;
+	let diff = 0.05;
+
+	/* agent behaviour parameters */
+	let off = 18/720; // sensory offset
+	let ang = 0.125;  // sensory angle
+	let trn = 0.125;  // turn angle
 	
 	function timestep () {
 	    window.requestAnimationFrame(timestep);
@@ -307,6 +328,11 @@
 	    /* timestep background field */
 	    setBuffer(gl, pfdata, pfdxloc, xbuf, 2, gl.FLOAT);
 	    setUniform(gl, null, pfdfloc, "1i", ping ? 0 : 1);
+
+      	    setUniform(gl, null, pfdevaploc, "1f", evap);
+    	    setUniform(gl, null, pfddiffloc, "1f", diff);
+
+
 	    render(gl, null, ping ? fbfb : fbfa, gl.TRIANGLE_STRIP, 0, 4);
 	    render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
 
@@ -314,7 +340,11 @@
    	    setBuffer(gl, ppdata, ppdxloc, xbuf, 2, gl.FLOAT);
 	    setUniform(gl, null, ppdfloc, "1i", ping ? 0 : 1);
    	    setUniform(gl, null, ppdploc, "1i", ping ? 2 : 3);
+
    	    setUniform(gl, null, ppdtloc, "1f", t);
+	    setUniform(gl, null, ppdoffloc, "1f", off);
+	    setUniform(gl, null, ppdangloc, "1f", ang);
+	    setUniform(gl, null, ppdtrnloc, "1f", trn);
 
 	    render(gl, null, ping ? fbfq : fbfp, gl.TRIANGLE_STRIP, 0, 4);
 	    //render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
