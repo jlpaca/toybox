@@ -116,18 +116,8 @@
 	  float ff = texture(f, xy+off*vec2(cos((th    )*TAU), sin((th    )*TAU))).r;
 	  float fl = texture(f, xy+off*vec2(cos((th+ang)*TAU), sin((th+ang)*TAU))).r;
 	  float fr = texture(f, xy+off*vec2(cos((th-ang)*TAU), sin((th-ang)*TAU))).r;
-
-	  /*
-	  if (ff > fl && ff > fr) {
-
-	  } else if (fl > fr) {
-	      th += trn;
-	  } else if (fr > fl) {
-	      th -= trn;
-	  }
-	  */
 	  
-	  th += trn * (fl-fr)/(fl+fr+ff+1e-6)*2.;
+	  th += ang*(fl-fr)/(fl+fr+ff+1e-6)*trn;
 	  
 	  vec2 dxy = vec2(cos(th*TAU), sin(th*TAU))*v;
 	  
@@ -170,14 +160,15 @@
     </script>
 
     <!-- actual output -->
-    <script id = "f-f-img" type = "text/glsl">#version 300 es
+    <script id = "f-img" type = "text/glsl">#version 300 es
       precision mediump float;
 
       uniform sampler2D f;
       out vec4 fragc;
       
       void main () {
-	  fragc = vec4(1., 0., 1., 1.);
+	  vec4 prev = texture(f, gl_FragCoord.xy/720.);
+	  fragc = vec4(prev.rrr*(1.-prev.a*0.05), 1.);
       }
     </script>
 
@@ -206,7 +197,8 @@
 
 
 	const W = 720; /* W-by-W canvas */
-	const M = 64; /* M^2 particles */
+	const M = 256; /* M^2 particles */
+	const N = 1e+4; /* population */
 	
 	const vquad = makeShader(gl, document.getElementById("v-quad").text, gl.VERTEX_SHADER);
 	
@@ -215,6 +207,8 @@
 
 	const vppart = makeShader(gl, document.getElementById("v-p-part").text, gl.VERTEX_SHADER);
 	const fppart = makeShader(gl, document.getElementById("f-p-part").text, gl.FRAGMENT_SHADER);
+
+	const fimg = makeShader(gl, document.getElementById("f-img").text, gl.FRAGMENT_SHADER);
 
 	/* quad vertices */
 	const x = new Float32Array([1, 1, 1, -1, -1, 1, -1, -1]);
@@ -257,6 +251,13 @@
 	const pppijloc = gl.getAttribLocation(pppart, "ij");
 	const pppfloc = gl.getUniformLocation(pppart, "f");
 	const pppploc = gl.getUniformLocation(pppart, "p");
+	
+
+	/* program for pretty output */
+	const pimg = makeProgram(gl, vquad, fimg);
+	const pixloc = gl.getAttribLocation(pimg, "x");
+	const pifloc = gl.getUniformLocation(pimg, "f");
+	
 	
 	
 	/* two textures / framebuffers for ping-ponging the field */
@@ -302,10 +303,12 @@
 	const dt = 0.1;
 	const T = 1;
 
+	let fastforward = 4;
+	
 	/* diffusion & evaporation parameters */
 	const fu = {
 	    f: 0,
-	    evap: 0.005,
+	    evap: 0.01,
 	    diff: 0.05
 	};
 
@@ -314,50 +317,56 @@
 	    p: 2,
 	    f: 0,
 	    t: 0,
-	    off: 18/720, // sensory offset
-	    ang: 0.125,  // sensory angle
-	    trn: 0.125,  // turn angle
+	    off: 24/720, // sensory offset
+	    ang: 0.17,  // sensory angle
+	    trn: 1,  // turn angle
 	};
 	
 	function timestep () {
 	    window.requestAnimationFrame(timestep);
 
-	    /* timestep background field */
-	    setBuffer(gl, pfdata, pfdxloc, xbuf, 2, gl.FLOAT);
+	    for (let k = 0; k < fastforward; ++k) {
+		/* timestep background field */
+		setBuffer(gl, pfdata, pfdxloc, xbuf, 2, gl.FLOAT);
 
-	    fu.f = ping ? 0 : 1;
+		fu.f = ping ? 0 : 1;
 
-	    uniforms.pfdata.map((u) => {
-		setUniform(gl, null, u.location, u.type, fu[u.name]);
-	    });
+		uniforms.pfdata.map((u) => {
+		    setUniform(gl, null, u.location, u.type, fu[u.name]);
+		});
 
-	    render(gl, null, ping ? fbfb : fbfa, gl.TRIANGLE_STRIP, 0, 4);
+		render(gl, null, ping ? fbfb : fbfa, gl.TRIANGLE_STRIP, 0, 4);
+		//render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
+
+		/*timestep particles */
+   		setBuffer(gl, ppdata, ppdxloc, xbuf, 2, gl.FLOAT);
+
+		pu.p = ping ? 2 : 3;
+		pu.f = ping ? 0 : 1;
+		pu.t = pu.t + dt - (pu.t > T ? T : 0);
+		
+		uniforms.ppdata.map((u) => {
+		    setUniform(gl, null, u.location, u.type, pu[u.name]);
+		});
+
+		render(gl, null, ping ? fbfq : fbfp, gl.TRIANGLE_STRIP, 0, 4);
+		//render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
+
+		/* render points */
+		setBuffer(gl, pppart, pppijloc, ijbuf, 2, gl.FLOAT);
+		setUniform(gl, null, pppfloc, "1i", ping ? 0 : 1);
+		setUniform(gl, null, pppploc, "1i", ping ? 2 : 3);
+
+		render(gl, null, ping ? fbfb : fbfa, gl.POINTS, 0, N);
+		//render(gl, null, null, gl.POINTS, 0, M*M);
+
+		ping = !ping;
+	    }
+	    
+	    /* render colour output */
+	    setBuffer(gl, pimg, pixloc, xbuf, 2, gl.FLOAT);
+	    setUniform(gl, null, pifloc, "1i", ping ? 1 : 0);
 	    render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
-
-	    /*timestep particles */
-   	    setBuffer(gl, ppdata, ppdxloc, xbuf, 2, gl.FLOAT);
-
-	    pu.p = ping ? 2 : 3;
-	    pu.f = ping ? 0 : 1;
-	    pu.t = pu.t + dt - (pu.t > T ? T : 0);
-	    
-	    uniforms.ppdata.map((u) => {
-		setUniform(gl, null, u.location, u.type, pu[u.name]);
-	    });
-
-	    render(gl, null, ping ? fbfq : fbfp, gl.TRIANGLE_STRIP, 0, 4);
-	    //render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
-
-	    /* render points */
-	    setBuffer(gl, pppart, pppijloc, ijbuf, 2, gl.FLOAT);
-	    setUniform(gl, null, pppfloc, "1i", ping ? 0 : 1);
-	    setUniform(gl, null, pppploc, "1i", ping ? 2 : 3);
-
-	    render(gl, null, ping ? fbfb : fbfa, gl.POINTS, 0, M*M);
-	    render(gl, null, null, gl.POINTS, 0, M*M);
-	    
-	    ping = !ping;
-
 	}
 
 	timestep();
