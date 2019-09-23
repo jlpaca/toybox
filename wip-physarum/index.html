@@ -117,7 +117,7 @@
 	  float fl = texture(f, xy+off*vec2(cos((th+ang)*TAU), sin((th+ang)*TAU))).r;
 	  float fr = texture(f, xy+off*vec2(cos((th-ang)*TAU), sin((th-ang)*TAU))).r;
 	  
-	  th += ang*(fl-fr)/(fl+fr+ff+1e-6)*trn;
+	  th += ang*max(-1., min(1., (fl-fr)/(fl+fr+ff+1e-6)*trn));
 	  
 	  vec2 dxy = vec2(cos(th*TAU), sin(th*TAU))*v;
 	  
@@ -198,7 +198,7 @@
 
 	const W = 720; /* W-by-W canvas */
 	const M = 256; /* M^2 particles */
-	const N = 1e+4; /* population */
+	let N = 1e+4; /* population */
 	
 	const vquad = makeShader(gl, document.getElementById("v-quad").text, gl.VERTEX_SHADER);
 	
@@ -303,7 +303,7 @@
 	const dt = 0.1;
 	const T = 1;
 
-	let fastforward = 4;
+	let fastforward = 1;
 	
 	/* diffusion & evaporation parameters */
 	const fu = {
@@ -317,11 +317,68 @@
 	    p: 2,
 	    f: 0,
 	    t: 0,
-	    off: 24/720, // sensory offset
-	    ang: 0.17,  // sensory angle
+	    off: Math.pow(1.9, 5)/720, // sensory offset
+	    ang: 0.16,  // sensory angle
 	    trn: 1,  // turn angle
 	};
-	
+
+	/* interactivity */
+	window.addEventListener("keydown", (ev) => {
+	    
+	    switch (ev.key.toUpperCase()) {
+		// agent parameters
+
+	    case "A":
+		pu.ang -= 0.04;
+		break;
+	    case "S":
+		pu.ang += 0.04;
+		break;
+
+	    case "Z":
+		pu.off /= 1.9;
+		break;
+	    case "X":
+		pu.off *= 1.9;
+		break;
+
+	    case "Q":
+		pu.trn -= 0.2;
+		break;
+	    case "W":
+		pu.trn += 0.2;
+		break;
+
+		// environment parameters
+	    case "E":
+		fu.evap -= 0.05;
+		break;
+	    case "R":
+		fu.evap += 0.05;
+		break;
+		
+	    case "D":
+		fu.diff -= 0.06;
+		break;
+	    case "F":
+		fu.diff += 0.06;
+		break;
+		
+	    }
+
+	    pu.ang = Math.max(0.04, Math.min(0.24, pu.ang));
+	    pu.off = Math.max(Math.pow(1.9, 2)/720, Math.min(Math.pow(1.9, 6)/720, pu.off));
+	    pu.trn = Math.max(0, Math.min(1, pu.trn));
+
+	    fu.diff = Math.max(0, Math.min(0.2, fu.diff));
+	    fu.evap = Math.max(0.01, Math.min(0.21, fu.evap));
+	    
+	    console.log(`angle = ${pu.ang}\noffset = ${pu.off*720}\nturning = ${pu.trn}`);
+	    console.log(`diffusion = ${fu.diff}\nevaporation = ${fu.evap}`);
+
+	});
+
+	/* main loop */
 	function timestep () {
 	    window.requestAnimationFrame(timestep);
 
