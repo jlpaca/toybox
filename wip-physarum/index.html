@@ -5,8 +5,8 @@
     <style>
       html, body {
 	  margin: 0; padding: 0;
-	  background-color: #190f17;
-	  color: #9a376b;
+	  background-color: #040411;
+	  color: #5f9182;
 
 	  font-family: 'open sans', sans-serif;
 	  font-size: 14px;
@@ -179,13 +179,15 @@ vec3 hsv2rgb (vec3 c)
 }
       
       vec4 palette (float r) {
-	  /* r = mix(r, floor(r*8.)/8., 0.2); */
-	  /* return mix(vec4(r, r, 0., 1.), vec4(1., 0., 1., 1.), 0.2);*/
-	  float d = floor(r*8.)/8.;
-	  float h = 0.24*r-.12;
-	  float s = min(1., .4+.8*r);
-	  float v = mix(0.1, 1.0, mix(r, d, 0.5));
-	  return vec4(hsv2rgb(vec3(h, s, v)), 1.);
+	  /*
+	  r = mix(r, floor(r*8.)/8., .5);
+	  return vec4(2.*r-.5, r, .15, 1.);
+	  */
+	  return vec4(hsv2rgb(vec3(
+	      .7-.55*r,
+	      mix(.8, 1., r),
+	      r
+	  )), 1.);
       }
       
       void main () {
