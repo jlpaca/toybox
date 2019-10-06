@@ -5,7 +5,7 @@
     <style>
       html, body {
 	  margin: 0; padding: 0;
-	  background-color: #040411;
+	  background-color: #02040e;
 	  color: #5f9182;
 
 	  font-family: 'open sans', sans-serif;
@@ -13,6 +13,7 @@
       }
       h2 {
 	  font-size: 18px;
+	  color: #6b8;
       }
 
       /*UI*/
@@ -73,7 +74,7 @@
       uniform sampler2D f;
 
       const float deposit = 0.1;
-      
+      const float consume = 0.01;
     in float st;
       out vec4 fragc;
       
@@ -81,7 +82,7 @@
 	  vec4 prev = texture(f, gl_FragCoord.xy/720.);
 
 	  /* make particle location transparent for debugging. */
-	  fragc = vec4(prev.rgb, 0.) + vec4(deposit, 0., 0., 0.)*st;
+	  fragc = vec4(prev.rgb, 0.) + vec4(deposit, -consume, 0., 0.)*st;
       }
     </script>
 
@@ -145,13 +146,18 @@
 
       uniform float diff;
       uniform float evap;
-      
+
+      uniform float actn;
+      uniform float diam;
+      uniform vec2 curs;
+            
       const vec2[4] dxy = vec2[4](
 	  vec2(1., 0.), vec2(0., 1.), vec2(-1., 0.), vec2(0., -1)
       );
-      
+
       void main () {
-	  vec4 prev = texture(f, gl_FragCoord.xy/720.);
+	  vec2 xy = gl_FragCoord.xy/720.;
+	  vec4 prev = texture(f, xy);
 
 	  /* naïve diffusion */
 	  float ph = prev.r;
@@ -159,8 +165,20 @@
 	      ph += diff * (texture(f, (gl_FragCoord.xy+dxy[i])/720.).r - prev.r);
 	  }
 	  ph = mix(ph, 0., evap);
+
+	  float g = prev.g; /* food source */
+	  float c = float(distance(xy, curs) < diam); /* in cursor rance */
+
+	  /* interaction: deposit food */
+	  g = max(g, c * max(actn, 0.) * .02);
+	  ph = ph + g;
+
+	  /* interaction: erase food */
+	  g  = mix(g,  0., max(-c*actn, 0.));
+	  ph = mix(ph, 0., max(-c*actn, 0.));
+
 	  
-	  fragc = vec4(ph, 0., 0., 1.);
+	  fragc = vec4(ph, g, 0., 1.);
       }
     </script>
 
@@ -179,10 +197,9 @@ vec3 hsv2rgb (vec3 c)
 }
       
       vec4 palette (float r) {
-	  /*
+
 	  r = mix(r, floor(r*8.)/8., .5);
-	  return vec4(2.*r-.5, r, .15, 1.);
-	  */
+
 	  return vec4(hsv2rgb(vec3(
 	      .7-.55*r,
 	      mix(.8, 1., r),
@@ -208,7 +225,8 @@ vec3 hsv2rgb (vec3 c)
 	  <ul>
 	    <li>A/S,O/P,T/Y: adjust agent parameters (sensory angle/offset, turning ratio).</li>
 	    <li>D/F,E/R: adjust environment parameters (trail diffusion/evaporation).</li>
-	    <li>&uarr;/&darr;: increase/decrease timestep.</li>
+	    <li>LMB/RMB: erase/deposit food/pheromone trail</li>
+	    <li>&uarr;/&darr;: decrease/increase timestep.</li>
 	  </ul>
       </p></div>
       <script src = "physarum.js"></script>

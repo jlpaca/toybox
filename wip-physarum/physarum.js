@@ -54,10 +54,10 @@ uniforms.ppdata = ["f", "p", "t", "off", "ang", "trn"].map((name, i) => ({
 const pfdata = makeProgram(gl, vquad, ffdata);
 const pfdxloc = gl.getAttribLocation(pfdata, "x");
 
-uniforms.pfdata = ["f", "evap", "diff"].map((name, i) => ({
+uniforms.pfdata = ["f", "evap", "diff", "actn", "diam", "curs"].map((name, i) => ({
     name: name,
     location: gl.getUniformLocation(pfdata, name),
-    type: i < 1 ? "1i" : "1f"
+    type: i < 1 ? "1i" : (i < 5 ? "1f" : "2f")
 }));
 
 /* program for rendering particles onto field */
@@ -128,8 +128,12 @@ let fastforward = 2;
 const fu = {
     f: 0,
     evap: 0.01,
-    diff: 0.05
+    diff: 0.05,
+    actn: 0,
+    diam: 0.015,
+    curs: [0.2, 0.2],
 };
+let pending_actn = []; /* ad-hoc solution for faster-than-timestep interactions. */
 
 /* agent behaviour parameters */
 const pu = {
@@ -142,6 +146,32 @@ const pu = {
 };
 
 /* interactivity */
+canv.addEventListener("mousemove", (ev) => {
+    fu.curs[0] = ev.offsetX/720;
+    fu.curs[1] = 1-ev.offsetY/720;
+});
+canv.addEventListener("mousedown", (ev) => {
+    if (ev.button == 0) { // LMB
+	pending_actn.push(-1);
+    } else {
+	pending_actn.push(1);
+    }
+});
+window.addEventListener("mouseup", (ev) => {
+    pending_actn.push(0);
+});
+canv.addEventListener("contextmenu", (ev) => { ev.preventDefault(); });
+canv.addEventListener('wheel', (ev) => {
+    if (event.deltaY > 0) {
+	fu.diam /= 1.8;
+    } else {
+	fu.diam *= 1.8;
+    }
+    fu.diam = Math.max(0.015*Math.pow(1.8,-1), Math.min(fu.diam, 0.015*Math.pow(1.8, 5)));
+    
+});
+
+
 window.addEventListener("keydown", (ev) => {
     
     switch (ev.key.toUpperCase()) {
@@ -229,6 +259,11 @@ function timestep () {
     window.requestAnimationFrame(timestep);
 
     for (let k = 0; k < fastforward; ++k) {
+	/* interactions */
+	if (pending_actn.length > 0) {
+	    fu.actn = pending_actn.shift();
+	}
+	
 	/* timestep background field */
 	setBuffer(gl, pfdata, pfdxloc, xbuf, 2, gl.FLOAT);
 
@@ -239,7 +274,7 @@ function timestep () {
 	});
 
 	render(gl, null, ping ? fbfb : fbfa, gl.TRIANGLE_STRIP, 0, 4);
-	//render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
+	// render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
 
 	/*timestep particles */
    	setBuffer(gl, ppdata, ppdxloc, xbuf, 2, gl.FLOAT);
@@ -253,7 +288,7 @@ function timestep () {
 	});
 
 	render(gl, null, ping ? fbfq : fbfp, gl.TRIANGLE_STRIP, 0, 4);
-	//render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
+	// render(gl, null, null, gl.TRIANGLE_STRIP, 0, 4);
 
 	/* render points */
 	setBuffer(gl, pppart, pppijloc, ijbuf, 2, gl.FLOAT);
